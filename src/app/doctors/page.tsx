@@ -86,12 +86,17 @@ export default function DoctorsRoster() {
   };
 
   const handleDeleteUser = async (doctor: any) => {
+    const targetId = doctor.id || doctor._id || doctor.email;
+    if (!targetId) {
+      alert('Cannot delete: Missing doctor identifier');
+      return;
+    }
     const confirmName = `Dr. ${doctor.firstName || ''} ${doctor.lastName || ''}`.trim();
     if (!window.confirm(`⚠️ PERMANENT DELETE WARNING!\n\nAre you sure you want to permanently delete doctor account "${confirmName}" (${doctor.email})?\n\nThis action cannot be undone.`)) {
       return;
     }
     try {
-      const res = await adminApi.deleteUser(doctor.id || doctor._id);
+      const res = await adminApi.deleteUser(targetId);
       if (res.success) {
         setToastMessage(`✅ Doctor account "${confirmName}" permanently deleted successfully!`);
         fetchDoctors();

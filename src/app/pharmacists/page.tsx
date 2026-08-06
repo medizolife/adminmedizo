@@ -91,12 +91,17 @@ export default function PharmacistsRoster() {
   };
 
   const handleDeleteUser = async (pharmacist: any) => {
+    const targetId = pharmacist.id || pharmacist._id || pharmacist.email;
+    if (!targetId) {
+      alert('Cannot delete: Missing pharmacist identifier');
+      return;
+    }
     const confirmName = `${pharmacist.firstName || ''} ${pharmacist.lastName || ''}`.trim() || pharmacist.email;
     if (!window.confirm(`⚠️ PERMANENT DELETE WARNING!\n\nAre you sure you want to permanently delete pharmacist account "${confirmName}" (${pharmacist.email})?\n\nThis action cannot be undone.`)) {
       return;
     }
     try {
-      const res = await adminApi.deleteUser(pharmacist.id || pharmacist._id);
+      const res = await adminApi.deleteUser(targetId);
       if (res.success) {
         setToastMessage(`✅ Pharmacist account "${confirmName}" permanently deleted successfully!`);
         fetchPharmacists();

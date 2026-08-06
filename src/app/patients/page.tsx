@@ -71,12 +71,17 @@ export default function PatientsRoster() {
   };
 
   const handleDeleteUser = async (patient: any) => {
+    const targetId = patient.id || patient._id || patient.email;
+    if (!targetId) {
+      alert('Cannot delete: Missing patient identifier');
+      return;
+    }
     const confirmName = `${patient.firstName || ''} ${patient.lastName || ''}`.trim() || patient.email;
     if (!window.confirm(`⚠️ PERMANENT DELETE WARNING!\n\nAre you sure you want to permanently delete patient "${confirmName}" (${patient.email})?\n\nThis action cannot be undone.`)) {
       return;
     }
     try {
-      const res = await adminApi.deleteUser(patient.id || patient._id);
+      const res = await adminApi.deleteUser(targetId);
       if (res.success) {
         setToastMessage(`✅ Patient "${confirmName}" permanently deleted successfully!`);
         fetchPatients();
