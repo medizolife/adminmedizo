@@ -60,6 +60,12 @@ export const adminApi = {
     return response.data;
   },
 
+  // Permanently delete a user account
+  deleteUser: async (userId: string) => {
+    const response = await api.delete(`/admin/users/${userId}`);
+    return response.data;
+  },
+
   // Create new user (e.g. pharmacist, doctor, patient)
   createUser: async (userData: any) => {
     const response = await api.post('/admin/users', userData);

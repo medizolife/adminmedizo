@@ -28,6 +28,7 @@ import MedicalServicesIcon from '@mui/icons-material/MedicalServices';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import BlockIcon from '@mui/icons-material/Block';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import DeleteIcon from '@mui/icons-material/Delete';
 
 import AdminLayout from '@/components/AdminLayout';
 import { adminApi } from '@/services/adminApi';
@@ -81,6 +82,23 @@ export default function DoctorsRoster() {
       console.error('Error toggling status:', err);
     } finally {
       setActionLoading(false);
+    }
+  };
+
+  const handleDeleteUser = async (doctor: any) => {
+    const confirmName = `Dr. ${doctor.firstName || ''} ${doctor.lastName || ''}`.trim();
+    if (!window.confirm(`⚠️ PERMANENT DELETE WARNING!\n\nAre you sure you want to permanently delete doctor account "${confirmName}" (${doctor.email})?\n\nThis action cannot be undone.`)) {
+      return;
+    }
+    try {
+      const res = await adminApi.deleteUser(doctor.id || doctor._id);
+      if (res.success) {
+        setToastMessage(`✅ Doctor account "${confirmName}" permanently deleted successfully!`);
+        fetchDoctors();
+      }
+    } catch (err: any) {
+      console.error('Error deleting doctor:', err);
+      alert(err.response?.data?.message || 'Failed to delete doctor user.');
     }
   };
 
@@ -183,7 +201,7 @@ export default function DoctorsRoster() {
                 <TableCell>DigiLocker Status</TableCell>
                 <TableCell>Prescriptions Rx</TableCell>
                 <TableCell>Account Status</TableCell>
-                <TableCell align="right">Action (Activate/Deactivate)</TableCell>
+                <TableCell align="right">Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -259,16 +277,28 @@ export default function DoctorsRoster() {
                         />
                       </TableCell>
                       <TableCell align="right">
-                        <Button
-                          variant={isDeactivated ? 'contained' : 'outlined'}
-                          color={isDeactivated ? 'success' : 'error'}
-                          size="small"
-                          onClick={() => handleToggleStatus(doc)}
-                          startIcon={isDeactivated ? <CheckCircleIcon /> : <BlockIcon />}
-                          sx={{ borderRadius: '10px', fontWeight: 800 }}
-                        >
-                          {isDeactivated ? 'Activate' : 'Deactivate'}
-                        </Button>
+                        <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
+                          <Button
+                            variant={isDeactivated ? 'contained' : 'outlined'}
+                            color={isDeactivated ? 'success' : 'warning'}
+                            size="small"
+                            onClick={() => handleToggleStatus(doc)}
+                            startIcon={isDeactivated ? <CheckCircleIcon /> : <BlockIcon />}
+                            sx={{ borderRadius: '10px', fontWeight: 800 }}
+                          >
+                            {isDeactivated ? 'Activate' : 'Deactivate'}
+                          </Button>
+                          <Button
+                            variant="contained"
+                            color="error"
+                            size="small"
+                            onClick={() => handleDeleteUser(doc)}
+                            startIcon={<DeleteIcon />}
+                            sx={{ borderRadius: '10px', fontWeight: 800, bgcolor: '#DC2626', '&:hover': { bgcolor: '#B91C1C' } }}
+                          >
+                            Delete
+                          </Button>
+                        </Box>
                       </TableCell>
                     </TableRow>
                   );
