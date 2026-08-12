@@ -8,7 +8,7 @@ const nextConfig = {
         source: '/api/:path*',
         destination: process.env.NEXT_PUBLIC_API_URL 
           ? `${process.env.NEXT_PUBLIC_API_URL}/:path*` 
-          : 'https://medizoserver.vercel.app/api/:path*'
+          : 'https://medizoserver.medizolife.workers.dev/api/:path*'
       }
     ];
   }

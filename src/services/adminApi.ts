@@ -5,7 +5,7 @@ const getApiUrl = () => {
     const url = process.env.NEXT_PUBLIC_API_URL.replace(/\/$/, '');
     return url.endsWith('/api') ? url : `${url}/api`;
   }
-  return 'https://medizoserver.vercel.app/api';
+  return 'https://medizoserver.medizolife.workers.dev/api';
 };
 
 const API_URL = getApiUrl();

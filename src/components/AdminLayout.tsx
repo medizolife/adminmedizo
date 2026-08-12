@@ -26,6 +26,11 @@ import LogoutIcon from '@mui/icons-material/Logout';
 import MenuIcon from '@mui/icons-material/Menu';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import VerifiedUserIcon from '@mui/icons-material/VerifiedUser';
+import HealingIcon from '@mui/icons-material/Healing';
+import HomeWorkIcon from '@mui/icons-material/HomeWork';
+import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
+import PaymentsIcon from '@mui/icons-material/Payments';
+import AssignmentIndIcon from '@mui/icons-material/AssignmentInd';
 
 const DRAWER_WIDTH = 260;
 
@@ -59,8 +64,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const navItems = [
     { label: 'Overview', path: '/dashboard', icon: <DashboardIcon /> },
     { label: 'Doctors Roster', path: '/doctors', icon: <MedicalServicesIcon /> },
+    { label: 'Nurses Roster', path: '/nurses', icon: <HealingIcon /> },
     { label: 'Patients Roster', path: '/patients', icon: <PeopleIcon /> },
     { label: 'Pharmacists Roster', path: '/pharmacists', icon: <LocalPharmacyIcon /> },
+    { label: 'Home Care Requests', path: '/home-care', icon: <HomeWorkIcon /> },
+    { label: 'Doctor Referrals', path: '/referrals', icon: <SwapHorizIcon /> },
+    { label: 'Assignment Matrix', path: '/assignments', icon: <AssignmentIndIcon /> },
+    { label: 'Billing Oversight', path: '/billing', icon: <PaymentsIcon /> },
     { label: 'Prescription Logs', path: '/transactions', icon: <ReceiptLongIcon /> }
   ];
 
@@ -184,7 +194,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
             <Chip
               icon={<VerifiedUserIcon sx={{ fontSize: '14px !important', color: '#00C896 !important' }} />}
-              label="Live Mongo System"
+              label="Live Cloudflare D1 System"
               size="small"
               sx={{ bgcolor: 'rgba(0, 200, 150, 0.12)', color: '#00C896', border: '1px solid rgba(0, 200, 150, 0.3)', fontWeight: 700 }}
             />

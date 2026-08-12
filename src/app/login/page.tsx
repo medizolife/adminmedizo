@@ -149,8 +149,8 @@ export default function AdminLogin() {
         </form>
 
         <Box sx={{ mt: 3, pt: 2, borderTop: '1px solid rgba(255,255,255,0.08)', textAlign: 'center' }}>
-          <Typography variant="caption" sx={{ color: '#94A8A3', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
-            <VerifiedUserIcon sx={{ fontSize: 14, color: '#00C896' }} /> Connected to Shared Live MongoDB Cluster
+          <Typography variant="caption" sx={{ color: '#94A8A3', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.8 }}>
+            <VerifiedUserIcon sx={{ fontSize: 14, color: '#00C896' }} /> Connected to Live Cloudflare D1 Database
           </Typography>
         </Box>
       </Paper>
