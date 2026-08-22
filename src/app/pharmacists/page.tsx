@@ -29,6 +29,8 @@ import BlockIcon from '@mui/icons-material/Block';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import DeleteIcon from '@mui/icons-material/Delete';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
+import AccessTimeIcon from '@mui/icons-material/AccessTime';
 
 import AdminLayout from '@/components/AdminLayout';
 import UserDetailModal from '@/components/UserDetailModal';
@@ -43,6 +45,28 @@ export default function PharmacistsRoster() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedPharmacist, setSelectedPharmacist] = useState<any>(null);
   const [toastMessage, setToastMessage] = useState('');
+
+  const formatDate = (dateStr?: string) => {
+    if (!dateStr) return 'N/A';
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+
+  const formatTimeAgo = (dateStr?: string) => {
+    if (!dateStr) return 'Recently';
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    const diffSec = Math.floor((Date.now() - d.getTime()) / 1000);
+    if (diffSec < 60) return 'Just now';
+    if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
+    if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`;
+    const days = Math.floor(diffSec / 86400);
+    if (days === 1) return 'Yesterday';
+    if (days < 30) return `${days}d ago`;
+    if (days < 365) return `${Math.floor(days / 30)}mo ago`;
+    return `${Math.floor(days / 365)}y ago`;
+  };
   
   // Modal state for adding new Pharmacist
   const [addModalOpen, setAddModalOpen] = useState(false);
@@ -252,6 +276,8 @@ export default function PharmacistsRoster() {
                 <TableCell>Pharmacist Name</TableCell>
                 <TableCell>Pharmacy &amp; License #</TableCell>
                 <TableCell>Contact &amp; Address</TableCell>
+                <TableCell>Account Created</TableCell>
+                <TableCell>Last Login / Active</TableCell>
                 <TableCell>Account Status</TableCell>
                 <TableCell align="right">Actions</TableCell>
               </TableRow>
@@ -259,19 +285,21 @@ export default function PharmacistsRoster() {
             <TableBody>
               {!isPreloaded && pharmacists.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} align="center" sx={{ py: 6 }}>
+                  <TableCell colSpan={7} align="center" sx={{ py: 6 }}>
                     <CircularProgress color="primary" />
                   </TableCell>
                 </TableRow>
               ) : filteredPharmacists.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} align="center" sx={{ py: 6, color: themeColors.textSecondary }}>
+                  <TableCell colSpan={7} align="center" sx={{ py: 6, color: themeColors.textSecondary }}>
                     No pharmacists found matching criteria.
                   </TableCell>
                 </TableRow>
               ) : (
                 filteredPharmacists.map((pharm) => {
                   const isDeactivated = pharm.status === 'deactivated';
+                  const createdDate = pharm.createdAt;
+                  const lastActiveDate = pharm.lastLogin || pharm.updatedAt || pharm.createdAt;
                   return (
                     <TableRow key={pharm.id || pharm._id} sx={{ '& td': { borderColor: themeColors.border, color: themeColors.textPrimary } }}>
                       <TableCell>
@@ -307,6 +335,28 @@ export default function PharmacistsRoster() {
                         <Typography variant="caption" sx={{ color: themeColors.textSecondary }}>
                           {pharm.pharmacyAddress || 'City Center'}
                         </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                          <Typography variant="body2" sx={{ fontWeight: 700, color: themeColors.textPrimary, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            <CalendarMonthIcon sx={{ fontSize: 13, color: '#00C896' }} />
+                            {createdDate ? formatDate(createdDate) : 'July 2026'}
+                          </Typography>
+                          <Typography variant="caption" sx={{ color: themeColors.textSecondary, fontWeight: 600, fontSize: '0.7rem' }}>
+                            {formatTimeAgo(createdDate)}
+                          </Typography>
+                        </Box>
+                      </TableCell>
+                      <TableCell>
+                        <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                          <Typography variant="body2" sx={{ fontWeight: 700, color: themeColors.accentWarning, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            <AccessTimeIcon sx={{ fontSize: 13, color: themeColors.accentWarning }} />
+                            {lastActiveDate ? formatDate(lastActiveDate) : 'Active Today'}
+                          </Typography>
+                          <Typography variant="caption" sx={{ color: isLight ? '#B45309' : '#F59E0B', fontWeight: 700, fontSize: '0.7rem' }}>
+                            {formatTimeAgo(lastActiveDate)}
+                          </Typography>
+                        </Box>
                       </TableCell>
                       <TableCell>
                         <Chip

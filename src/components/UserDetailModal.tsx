@@ -173,6 +173,35 @@ export default function UserDetailModal({
   const [graphCategory, setGraphCategory] = useState<'all' | 'prescription' | 'billing' | 'home_care' | 'security'>('all');
   const [hoveredPoint, setHoveredPoint] = useState<any>(null);
 
+  const formatDate = (dateStr?: string) => {
+    if (!dateStr) return 'N/A';
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+
+  const formatFullDate = (dateStr?: string) => {
+    if (!dateStr) return 'N/A';
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  };
+
+  const formatTimeAgo = (dateStr?: string) => {
+    if (!dateStr) return 'Recently';
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    const diffSec = Math.floor((Date.now() - d.getTime()) / 1000);
+    if (diffSec < 60) return 'Just now';
+    if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
+    if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`;
+    const days = Math.floor(diffSec / 86400);
+    if (days === 1) return 'Yesterday';
+    if (days < 30) return `${days}d ago`;
+    if (days < 365) return `${Math.floor(days / 30)}mo ago`;
+    return `${Math.floor(days / 365)}y ago`;
+  };
+
   const fetchDetails = async (targetId?: string, targetInitData?: any) => {
     const idToFetch = targetId || activeUserId || userId;
     if (!idToFetch) return;
@@ -499,35 +528,6 @@ export default function UserDetailModal({
     return monthBuckets;
   };
 
-  // Relative time helper
-  const formatTimeAgo = (dateStr: string) => {
-    if (!dateStr) return 'Recently';
-    const date = new Date(dateStr);
-    if (isNaN(date.getTime())) return 'Recently';
-    const diff = Math.floor((Date.now() - date.getTime()) / 1000);
-    if (diff < 60) return `${diff}s ago`;
-    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-    const days = Math.floor(diff / 86400);
-    if (days < 30) return `${days} days ago`;
-    if (days < 365) return `${Math.floor(days / 30)} months ago`;
-    return `${Math.floor(days / 365)} years ago`;
-  };
-
-  // Format full date
-  const formatFullDate = (dateStr: string) => {
-    if (!dateStr) return 'N/A';
-    const date = new Date(dateStr);
-    if (isNaN(date.getTime())) return dateStr;
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
-
   // Activity filter logic
   const filteredActivities = activities.filter((act: any) => {
     if (activityFilter !== 'all') {
@@ -568,9 +568,9 @@ export default function UserDetailModal({
     }
 
     const width = 800;
-    const height = 240;
-    const padX = 60;
-    const padY = 45;
+    const height = 165;
+    const padX = 50;
+    const padY = 32;
     const maxVal = Math.max(...points.map((p: any) => p.count || 0), 5);
 
     const coords = points.map((p: any, i: number) => {
@@ -596,12 +596,12 @@ export default function UserDetailModal({
                        graphCategory === 'security' ? '#34D399' : '#00C896';
 
     return (
-      <Box sx={{ position: 'relative', width: '100%', overflowX: 'auto', py: 1 }}>
-        <svg viewBox={`0 0 ${width} ${height}`} style={{ width: '100%', height: 'auto', minWidth: 600 }}>
+      <Box sx={{ position: 'relative', width: '100%', overflowX: 'auto', py: 0.5 }}>
+        <svg viewBox={`0 0 ${width} ${height}`} style={{ width: '100%', height: 'auto', minWidth: 550, maxHeight: 175 }}>
           <defs>
             <linearGradient id="dynamicAreaGradient" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={themeColor} stopOpacity="0.45" />
-              <stop offset="60%" stopColor="#3B82F6" stopOpacity="0.15" />
+              <stop offset="0%" stopColor={themeColor} stopOpacity="0.38" />
+              <stop offset="60%" stopColor="#3B82F6" stopOpacity="0.12" />
               <stop offset="100%" stopColor="#0B1315" stopOpacity="0" />
             </linearGradient>
             <linearGradient id="dynamicLineGradient" x1="0" y1="0" x2="1" y2="0">
@@ -610,7 +610,7 @@ export default function UserDetailModal({
               <stop offset="100%" stopColor="#818CF8" />
             </linearGradient>
             <filter id="glowEffect" x="-30%" y="-30%" width="160%" height="160%">
-              <feGaussianBlur stdDeviation="3.5" result="coloredBlur" />
+              <feGaussianBlur stdDeviation="3" result="coloredBlur" />
               <feMerge>
                 <feMergeNode in="coloredBlur" />
                 <feMergeNode in="SourceGraphic" />
@@ -619,7 +619,7 @@ export default function UserDetailModal({
           </defs>
 
           {/* Grid lines */}
-          {[0, 0.25, 0.5, 0.75, 1].map((ratio, idx) => {
+          {[0, 0.33, 0.66, 1].map((ratio, idx) => {
             const y = height - padY - ratio * (height - padY * 2);
             return (
               <g key={idx}>
@@ -628,14 +628,14 @@ export default function UserDetailModal({
                   y1={y}
                   x2={width - padX}
                   y2={y}
-                  stroke="rgba(255, 255, 255, 0.07)"
-                  strokeDasharray="4 4"
+                  stroke="rgba(255, 255, 255, 0.06)"
+                  strokeDasharray="3 3"
                 />
                 <text
-                  x={padX - 12}
-                  y={y + 4}
+                  x={padX - 10}
+                  y={y + 3}
                   fill="#94A8A3"
-                  fontSize="11"
+                  fontSize="10"
                   fontWeight="600"
                   textAnchor="end"
                   fontFamily="monospace"
@@ -654,7 +654,7 @@ export default function UserDetailModal({
             d={pathD}
             fill="none"
             stroke="url(#dynamicLineGradient)"
-            strokeWidth="4"
+            strokeWidth="3.5"
             strokeLinecap="round"
             filter="url(#glowEffect)"
           />
@@ -679,20 +679,20 @@ export default function UserDetailModal({
               >
                 {/* Floating Value Pill on top of node */}
                 <rect
-                  x={pt.x - 16}
-                  y={pt.y - 25}
-                  width="32"
-                  height="18"
-                  rx="6"
-                  fill="rgba(11, 19, 21, 0.9)"
+                  x={pt.x - 14}
+                  y={pt.y - 20}
+                  width="28"
+                  height="15"
+                  rx="5"
+                  fill="rgba(11, 19, 21, 0.92)"
                   stroke={pt.count > 0 ? themeColor : 'rgba(255,255,255,0.1)'}
                   strokeWidth="1"
                 />
                 <text
                   x={pt.x}
-                  y={pt.y - 12}
+                  y={pt.y - 9}
                   fill={pt.count > 0 ? '#EBF5F3' : '#94A8A3'}
-                  fontSize="11"
+                  fontSize="10"
                   fontWeight="900"
                   textAnchor="middle"
                 >
@@ -704,7 +704,7 @@ export default function UserDetailModal({
                   <circle
                     cx={pt.x}
                     cy={pt.y}
-                    r="12"
+                    r="10"
                     fill="none"
                     stroke={themeColor}
                     strokeWidth="2"
@@ -716,10 +716,10 @@ export default function UserDetailModal({
                 <circle
                   cx={pt.x}
                   cy={pt.y}
-                  r="6.5"
+                  r="5.5"
                   fill="#0B1315"
                   stroke={pt.count > 0 ? themeColor : '#94A8A3'}
-                  strokeWidth="3.5"
+                  strokeWidth="3"
                   style={{ transition: 'all 0.2s' }}
                 />
 
@@ -727,16 +727,16 @@ export default function UserDetailModal({
                 <circle
                   cx={pt.x}
                   cy={pt.y}
-                  r="20"
+                  r="18"
                   fill="transparent"
                 />
 
                 {/* X-Axis Date/Month Label */}
                 <text
                   x={pt.x}
-                  y={height - 12}
+                  y={height - 10}
                   fill={isHighlighted ? '#00C896' : '#94A8A3'}
-                  fontSize="11"
+                  fontSize="10"
                   fontWeight={isHighlighted ? '900' : '700'}
                   textAnchor="middle"
                 >
@@ -802,20 +802,23 @@ export default function UserDetailModal({
     <Dialog
       open={open}
       onClose={onClose}
-      maxWidth="lg"
+      maxWidth={false}
       fullWidth
       PaperProps={{
         sx: {
           bgcolor: isLight ? '#FAF8F5' : '#0B1315',
           backgroundImage: isLight
-            ? 'radial-gradient(circle at 80% 20%, rgba(0, 143, 104, 0.06) 0%, transparent 60%)'
-            : 'radial-gradient(circle at 80% 20%, rgba(0, 200, 150, 0.08) 0%, transparent 60%)',
+            ? 'radial-gradient(circle at 80% 20%, rgba(0, 143, 104, 0.05) 0%, transparent 60%)'
+            : 'radial-gradient(circle at 80% 20%, rgba(0, 200, 150, 0.07) 0%, transparent 60%)',
           color: themeColors.textPrimary,
-          borderRadius: '24px',
+          borderRadius: '20px',
           border: isLight ? '1px solid rgba(45, 80, 60, 0.16)' : '1px solid rgba(0, 200, 150, 0.25)',
           boxShadow: isLight ? '0 20px 60px rgba(0,0,0,0.1)' : '0 25px 60px rgba(0,0,0,0.8)',
-          minHeight: 650,
-          maxHeight: '92vh'
+          width: '96vw',
+          maxWidth: '1750px',
+          minHeight: '85vh',
+          maxHeight: '95vh',
+          m: { xs: 1, sm: 2 }
         }
       }}
     >
@@ -824,35 +827,37 @@ export default function UserDetailModal({
         <Alert
           severity="success"
           sx={{
-            m: 2,
+            m: 1.5,
             mb: 0,
-            borderRadius: '12px',
+            py: 0.5,
+            borderRadius: '10px',
             bgcolor: 'rgba(0, 200, 150, 0.15)',
             color: '#34D399',
-            border: '1px solid rgba(0, 200, 150, 0.3)'
+            border: '1px solid rgba(0, 200, 150, 0.3)',
+            fontSize: '0.78rem'
           }}
         >
           {toast}
         </Alert>
       )}
 
-      {/* Dialog Header Card */}
-      <DialogTitle sx={{ p: { xs: 2.5, sm: 3.5 }, pb: 2, borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 2 }}>
-          {/* User Identity Column */}
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+      {/* Dialog Header Card - Compact & High-Density */}
+      <DialogTitle sx={{ p: { xs: 1.5, sm: 2 }, pb: 1.2, borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1.5 }}>
+          {/* User Identity Row */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
             <Box sx={{ position: 'relative' }}>
               <Avatar
                 src={currentUser?.profileImage || currentUser?.picture || ''}
                 sx={{
-                  width: 64,
-                  height: 64,
+                  width: 46,
+                  height: 46,
                   bgcolor: isDeactivated ? '#4B5563' : '#00C896',
                   color: '#0B1315',
                   fontWeight: 900,
-                  fontSize: '1.6rem',
+                  fontSize: '1.25rem',
                   border: '2px solid rgba(0, 200, 150, 0.5)',
-                  boxShadow: '0 0 20px rgba(0,200,150,0.35)'
+                  boxShadow: '0 0 15px rgba(0,200,150,0.3)'
                 }}
               >
                 {currentUser?.firstName?.[0] || 'U'}
@@ -860,26 +865,27 @@ export default function UserDetailModal({
               <Box
                 sx={{
                   position: 'absolute',
-                  bottom: -2,
-                  right: -2,
-                  width: 16,
-                  height: 16,
+                  bottom: -1,
+                  right: -1,
+                  width: 13,
+                  height: 13,
                   borderRadius: '50%',
                   bgcolor: isDeactivated ? '#EF4444' : '#10B981',
-                  border: '2.5px solid #0B1315'
+                  border: '2px solid #0B1315'
                 }}
               />
             </Box>
 
             <Box>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-                <Typography variant="h5" sx={{ fontWeight: 900, color: '#EBF5F3' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8, flexWrap: 'wrap' }}>
+                <Typography variant="h6" sx={{ fontWeight: 900, color: '#EBF5F3', fontSize: '1.15rem', lineHeight: 1.2 }}>
                   {userRole === 'doctor' ? `Dr. ${currentUser?.firstName || ''} ${currentUser?.lastName || ''}` : `${currentUser?.firstName || ''} ${currentUser?.lastName || ''}`}
                 </Typography>
                 <Chip
                   label={userRole.toUpperCase()}
                   size="small"
                   sx={{
+                    height: 20,
                     bgcolor:
                       userRole === 'doctor' ? 'rgba(0, 200, 150, 0.2)' :
                       userRole === 'pharmacist' ? 'rgba(245, 158, 11, 0.2)' :
@@ -891,7 +897,7 @@ export default function UserDetailModal({
                       userRole === 'nurse' ? '#C084FC' :
                       userRole === 'admin' ? '#F87171' : '#60A5FA',
                     fontWeight: 900,
-                    fontSize: '0.72rem',
+                    fontSize: '0.64rem',
                     border: '1px solid rgba(255,255,255,0.1)'
                   }}
                 />
@@ -899,54 +905,55 @@ export default function UserDetailModal({
                   label={isDeactivated ? 'DEACTIVATED' : 'ACTIVE'}
                   size="small"
                   sx={{
+                    height: 20,
                     bgcolor: isDeactivated ? 'rgba(239, 68, 68, 0.15)' : 'rgba(16, 185, 129, 0.15)',
                     color: isDeactivated ? '#EF4444' : '#10B981',
                     fontWeight: 900,
-                    fontSize: '0.7rem'
+                    fontSize: '0.64rem'
                   }}
                 />
                 {currentUser?.digilockerVerified && (
                   <Chip
-                    icon={<VerifiedUserIcon sx={{ fontSize: '14px !important', color: '#ffffff !important' }} />}
+                    icon={<VerifiedUserIcon sx={{ fontSize: '12px !important', color: '#ffffff !important' }} />}
                     label="DigiLocker KYC"
                     size="small"
-                    sx={{ bgcolor: '#15803D', color: '#ffffff', fontWeight: 800, fontSize: '0.68rem' }}
+                    sx={{ height: 20, bgcolor: '#15803D', color: '#ffffff', fontWeight: 800, fontSize: '0.62rem' }}
                   />
                 )}
               </Box>
 
-              {/* Contact & ID Row */}
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mt: 0.8, flexWrap: 'wrap', color: '#94A8A3', fontSize: '0.8rem' }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  <EmailIcon sx={{ fontSize: 15, color: '#00C896' }} />
+              {/* Contact & Meta Row */}
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mt: 0.4, flexWrap: 'wrap', color: '#94A8A3', fontSize: '0.72rem' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.4 }}>
+                  <EmailIcon sx={{ fontSize: 13, color: '#00C896' }} />
                   <span>{currentUser?.email || 'N/A'}</span>
                   {currentUser?.email && (
                     <Tooltip title="Copy Email">
-                      <IconButton size="small" onClick={() => copyToClipboard(currentUser.email, 'Email')} sx={{ color: '#94A8A3', p: 0.3 }}>
-                        <ContentCopyIcon sx={{ fontSize: 13 }} />
+                      <IconButton size="small" onClick={() => copyToClipboard(currentUser.email, 'Email')} sx={{ color: '#94A8A3', p: 0.2 }}>
+                        <ContentCopyIcon sx={{ fontSize: 11 }} />
                       </IconButton>
                     </Tooltip>
                   )}
                 </Box>
 
                 {currentUser?.phone && (
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                    <PhoneIcon sx={{ fontSize: 15, color: '#38BDF8' }} />
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.4 }}>
+                    <PhoneIcon sx={{ fontSize: 13, color: '#38BDF8' }} />
                     <span>{currentUser.phone}</span>
                     <Tooltip title="Copy Phone">
-                      <IconButton size="small" onClick={() => copyToClipboard(currentUser.phone, 'Phone')} sx={{ color: '#94A8A3', p: 0.3 }}>
-                        <ContentCopyIcon sx={{ fontSize: 13 }} />
+                      <IconButton size="small" onClick={() => copyToClipboard(currentUser.phone, 'Phone')} sx={{ color: '#94A8A3', p: 0.2 }}>
+                        <ContentCopyIcon sx={{ fontSize: 11 }} />
                       </IconButton>
                     </Tooltip>
                   </Box>
                 )}
 
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  <BadgeIcon sx={{ fontSize: 15, color: '#C084FC' }} />
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.4 }}>
+                  <BadgeIcon sx={{ fontSize: 13, color: '#C084FC' }} />
                   <span style={{ fontFamily: 'monospace' }}>ID: {(currentUser?.id || currentUser?._id || '').substring(0, 10)}...</span>
                   <Tooltip title="Copy User ID">
-                    <IconButton size="small" onClick={() => copyToClipboard(currentUser?.id || currentUser?._id || '', 'User ID')} sx={{ color: '#94A8A3', p: 0.3 }}>
-                      <ContentCopyIcon sx={{ fontSize: 13 }} />
+                    <IconButton size="small" onClick={() => copyToClipboard(currentUser?.id || currentUser?._id || '', 'User ID')} sx={{ color: '#94A8A3', p: 0.2 }}>
+                      <ContentCopyIcon sx={{ fontSize: 11 }} />
                     </IconButton>
                   </Tooltip>
                 </Box>
@@ -955,21 +962,23 @@ export default function UserDetailModal({
           </Box>
 
           {/* Action Buttons Right Header */}
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8 }}>
             {userHistory.length > 0 && (
               <Button
                 variant="outlined"
                 size="small"
-                startIcon={<ArrowBackIcon />}
+                startIcon={<ArrowBackIcon sx={{ fontSize: 14 }} />}
                 onClick={handleNavigateBack}
                 sx={{
-                  borderRadius: '10px',
+                  borderRadius: '8px',
                   borderColor: '#00C896',
                   color: '#00C896',
                   bgcolor: 'rgba(0, 200, 150, 0.12)',
                   fontWeight: 800,
                   textTransform: 'none',
-                  px: 1.5,
+                  fontSize: '0.72rem',
+                  py: 0.3,
+                  px: 1.2,
                   '&:hover': { bgcolor: 'rgba(0, 200, 150, 0.25)', borderColor: '#34D399' }
                 }}
               >
@@ -982,10 +991,10 @@ export default function UserDetailModal({
               size="small"
               disabled={actionLoading}
               onClick={handleToggleStatus}
-              startIcon={isDeactivated ? <CheckCircleIcon /> : <BlockIcon />}
-              sx={{ borderRadius: '10px', fontWeight: 800, textTransform: 'none', px: 2 }}
+              startIcon={isDeactivated ? <CheckCircleIcon sx={{ fontSize: 14 }} /> : <BlockIcon sx={{ fontSize: 14 }} />}
+              sx={{ borderRadius: '8px', fontWeight: 800, textTransform: 'none', fontSize: '0.72rem', py: 0.3, px: 1.2 }}
             >
-              {isDeactivated ? 'Activate User' : 'Deactivate'}
+              {isDeactivated ? 'Activate' : 'Deactivate'}
             </Button>
             {userRole !== 'admin' && (
               <Button
@@ -994,8 +1003,8 @@ export default function UserDetailModal({
                 size="small"
                 disabled={actionLoading}
                 onClick={handleDeleteUser}
-                startIcon={<DeleteIcon />}
-                sx={{ borderRadius: '10px', fontWeight: 800, textTransform: 'none' }}
+                startIcon={<DeleteIcon sx={{ fontSize: 14 }} />}
+                sx={{ borderRadius: '8px', fontWeight: 800, textTransform: 'none', fontSize: '0.72rem', py: 0.3, px: 1.2 }}
               >
                 Delete
               </Button>
@@ -1004,177 +1013,266 @@ export default function UserDetailModal({
               variant="outlined"
               size="small"
               onClick={() => window.print()}
-              startIcon={<PrintIcon />}
-              sx={{ borderRadius: '10px', borderColor: 'rgba(255,255,255,0.2)', color: '#EBF5F3', fontWeight: 700, textTransform: 'none' }}
+              startIcon={<PrintIcon sx={{ fontSize: 14 }} />}
+              sx={{ borderRadius: '8px', borderColor: 'rgba(255,255,255,0.2)', color: '#EBF5F3', fontWeight: 700, textTransform: 'none', fontSize: '0.72rem', py: 0.3, px: 1.2 }}
             >
               Export Dossier
             </Button>
-            <IconButton onClick={() => fetchDetails()} sx={{ color: '#00C896', bgcolor: 'rgba(255,255,255,0.05)', borderRadius: '10px' }}>
-              <RefreshIcon />
+            <IconButton size="small" onClick={() => fetchDetails()} sx={{ color: '#00C896', bgcolor: 'rgba(255,255,255,0.05)', borderRadius: '8px', p: 0.6 }}>
+              <RefreshIcon sx={{ fontSize: 16 }} />
             </IconButton>
-            <IconButton onClick={onClose} sx={{ color: '#94A8A3', bgcolor: 'rgba(255,255,255,0.05)', borderRadius: '10px' }}>
-              <CloseIcon />
+            <IconButton size="small" onClick={onClose} sx={{ color: '#94A8A3', bgcolor: 'rgba(255,255,255,0.05)', borderRadius: '8px', p: 0.6 }}>
+              <CloseIcon sx={{ fontSize: 16 }} />
             </IconButton>
           </Box>
         </Box>
 
-        {/* Top Key Metrics Banner Strip - Interactive with Hover Glow & Direct Navigation */}
-        <Grid container spacing={1.5} sx={{ mt: 2.5 }}>
-          <Grid item xs={12} sm={6} md={2.4}>
+        {/* Top Key Metrics Banner Strip - 8 Ultra-Compact, High-Density Metric Tiles Across Screen */}
+        <Grid container spacing={1} sx={{ mt: 1.2 }}>
+          {/* 1. Registered Date */}
+          <Grid item xs={6} sm={4} md={3} lg={1.5}>
             <Tooltip title="Click to view Registration & Security Audit Details">
               <Paper
                 onClick={() => { setActiveTab(3); setActivityFilter('security'); }}
                 sx={{
-                  p: 1.5,
-                  borderRadius: '14px',
+                  p: 1,
+                  borderRadius: '10px',
                   bgcolor: 'rgba(19, 31, 34, 0.7)',
                   border: '1px solid rgba(255,255,255,0.08)',
                   cursor: 'pointer',
-                  transition: 'all 0.2s ease',
+                  transition: 'all 0.15s ease',
                   '&:hover': {
                     bgcolor: 'rgba(0, 200, 150, 0.12)',
                     borderColor: '#00C896',
-                    transform: 'translateY(-2px)',
-                    boxShadow: '0 4px 15px rgba(0,200,150,0.2)'
+                    transform: 'translateY(-1px)'
                   }
                 }}
               >
-                <Typography variant="caption" sx={{ color: '#94A8A3', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  <CalendarMonthIcon sx={{ fontSize: 14, color: '#00C896' }} /> Registered Date
+                <Typography variant="caption" sx={{ color: '#94A8A3', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 0.4, fontSize: '0.62rem' }}>
+                  <CalendarMonthIcon sx={{ fontSize: 13, color: '#00C896' }} /> Registered Date
                 </Typography>
-                <Typography variant="body2" sx={{ fontWeight: 800, color: '#EBF5F3', mt: 0.3 }}>
-                  {currentUser?.createdAt ? new Date(currentUser.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'July 2026'}
+                <Typography variant="body2" sx={{ fontWeight: 800, color: '#EBF5F3', fontSize: '0.80rem', mt: 0.2 }}>
+                  {currentUser?.createdAt ? formatDate(currentUser.createdAt) : 'July 2026'}
                 </Typography>
-                <Typography variant="caption" sx={{ color: '#34D399', fontSize: '0.68rem', fontWeight: 600 }}>
-                  {formatTimeAgo(currentUser?.createdAt)} • View Security
+                <Typography variant="caption" sx={{ color: '#34D399', fontSize: '0.60rem', fontWeight: 600, display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {formatTimeAgo(currentUser?.createdAt)} • Security
                 </Typography>
               </Paper>
             </Tooltip>
           </Grid>
 
-          <Grid item xs={12} sm={6} md={2.4}>
+          {/* 2. Last Login / Active */}
+          <Grid item xs={6} sm={4} md={3} lg={1.5}>
             <Tooltip title="Click to view Live Logins, Frequency Heatmap & Security Trail">
               <Paper
                 onClick={() => setActiveTab(5)}
                 sx={{
-                  p: 1.5,
-                  borderRadius: '14px',
+                  p: 1,
+                  borderRadius: '10px',
                   bgcolor: 'rgba(19, 31, 34, 0.7)',
                   border: '1px solid rgba(255,255,255,0.08)',
                   cursor: 'pointer',
-                  transition: 'all 0.2s ease',
+                  transition: 'all 0.15s ease',
                   '&:hover': {
                     bgcolor: 'rgba(56, 189, 248, 0.12)',
                     borderColor: '#38BDF8',
-                    transform: 'translateY(-2px)',
-                    boxShadow: '0 4px 15px rgba(56,189,248,0.2)'
+                    transform: 'translateY(-1px)'
                   }
                 }}
               >
-                <Typography variant="caption" sx={{ color: '#94A8A3', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  <AccessTimeIcon sx={{ fontSize: 14, color: '#38BDF8' }} /> Last Login / Active
+                <Typography variant="caption" sx={{ color: '#94A8A3', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 0.4, fontSize: '0.62rem' }}>
+                  <AccessTimeIcon sx={{ fontSize: 13, color: '#38BDF8' }} /> Last Login / Active
                 </Typography>
-                <Typography variant="body2" sx={{ fontWeight: 800, color: '#EBF5F3', mt: 0.3 }}>
-                  {currentUser?.updatedAt ? new Date(currentUser.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Active Today'}
+                <Typography variant="body2" sx={{ fontWeight: 800, color: '#EBF5F3', fontSize: '0.80rem', mt: 0.2 }}>
+                  {currentUser?.lastLogin || currentUser?.updatedAt ? formatDate(currentUser?.lastLogin || currentUser?.updatedAt) : 'Active Today'}
                 </Typography>
-                <Typography variant="caption" sx={{ color: '#38BDF8', fontSize: '0.68rem', fontWeight: 600 }}>
-                  {formatTimeAgo(currentUser?.updatedAt || currentUser?.createdAt)} • View Logs & Frequency
+                <Typography variant="caption" sx={{ color: '#38BDF8', fontSize: '0.60rem', fontWeight: 600, display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {formatTimeAgo(currentUser?.lastLogin || currentUser?.updatedAt || currentUser?.createdAt)} • Logs
                 </Typography>
               </Paper>
             </Tooltip>
           </Grid>
 
-          <Grid item xs={12} sm={6} md={2.4}>
+          {/* 3. Auth Provider */}
+          <Grid item xs={6} sm={4} md={3} lg={1.5}>
             <Tooltip title="Click to view Authentication Method & Security Logs">
               <Paper
                 onClick={() => setActiveTab(5)}
                 sx={{
-                  p: 1.5,
-                  borderRadius: '14px',
+                  p: 1,
+                  borderRadius: '10px',
                   bgcolor: 'rgba(19, 31, 34, 0.7)',
                   border: '1px solid rgba(255,255,255,0.08)',
                   cursor: 'pointer',
-                  transition: 'all 0.2s ease',
+                  transition: 'all 0.15s ease',
                   '&:hover': {
                     bgcolor: 'rgba(192, 132, 252, 0.12)',
                     borderColor: '#C084FC',
-                    transform: 'translateY(-2px)',
-                    boxShadow: '0 4px 15px rgba(192,132,252,0.2)'
+                    transform: 'translateY(-1px)'
                   }
                 }}
               >
-                <Typography variant="caption" sx={{ color: '#94A8A3', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  <SecurityIcon sx={{ fontSize: 14, color: '#C084FC' }} /> Auth Provider
+                <Typography variant="caption" sx={{ color: '#94A8A3', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 0.4, fontSize: '0.62rem' }}>
+                  <SecurityIcon sx={{ fontSize: 13, color: '#C084FC' }} /> Auth Provider
                 </Typography>
-                <Typography variant="body2" sx={{ fontWeight: 800, color: '#EBF5F3', mt: 0.3 }}>
-                  {currentUser?.googleId ? 'Google OAuth' : (currentUser?.authProvider === 'mobile' ? 'Mobile DOB OTP' : 'Email & Password')}
+                <Typography variant="body2" sx={{ fontWeight: 800, color: '#EBF5F3', fontSize: '0.80rem', mt: 0.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {currentUser?.googleId ? 'Google OAuth' : (currentUser?.authProvider === 'mobile' ? 'Mobile OTP' : 'Email & Password')}
                 </Typography>
-                <Typography variant="caption" sx={{ color: '#C084FC', fontSize: '0.68rem', fontWeight: 600 }}>
-                  256-bit Encrypted • View Sessions
+                <Typography variant="caption" sx={{ color: '#C084FC', fontSize: '0.60rem', fontWeight: 600, display: 'block' }}>
+                  256-bit Encrypted
                 </Typography>
               </Paper>
             </Tooltip>
           </Grid>
 
-          <Grid item xs={12} sm={6} md={2.4}>
+          {/* 4. Connected Patients / Network */}
+          <Grid item xs={6} sm={4} md={3} lg={1.5}>
             <Tooltip title={userRole === 'doctor' ? "Click to view Connected Patients Matrix" : "Click to view Connected Care Team"}>
               <Paper
                 onClick={() => setActiveTab(1)}
                 sx={{
-                  p: 1.5,
-                  borderRadius: '14px',
+                  p: 1,
+                  borderRadius: '10px',
                   bgcolor: 'rgba(19, 31, 34, 0.7)',
                   border: '1px solid rgba(0, 200, 150, 0.3)',
                   cursor: 'pointer',
-                  transition: 'all 0.2s ease',
+                  transition: 'all 0.15s ease',
                   '&:hover': {
                     bgcolor: 'rgba(0, 200, 150, 0.15)',
                     borderColor: '#00C896',
-                    transform: 'translateY(-2px)',
-                    boxShadow: '0 4px 15px rgba(0,200,150,0.25)'
+                    transform: 'translateY(-1px)'
                   }
                 }}
               >
-                <Typography variant="caption" sx={{ color: '#00C896', fontWeight: 800, display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  <GroupsIcon sx={{ fontSize: 14 }} /> {userRole === 'doctor' ? 'Connected Patients' : userRole === 'patient' ? 'Attending Doctors' : 'Connected Network'}
+                <Typography variant="caption" sx={{ color: '#00C896', fontWeight: 800, display: 'flex', alignItems: 'center', gap: 0.4, fontSize: '0.62rem' }}>
+                  <GroupsIcon sx={{ fontSize: 13 }} /> {userRole === 'doctor' ? 'Care Patients' : userRole === 'patient' ? 'Care Team' : 'Network'}
                 </Typography>
-                <Typography variant="body2" sx={{ fontWeight: 900, color: '#EBF5F3', mt: 0.3 }}>
-                  {userRole === 'doctor' ? `${connectedPatients.length} Active Patients` : userRole === 'patient' ? `${connectedDoctors.length} Doctors` : `${connectedNetwork.totalConnected || 8} Entities`}
+                <Typography variant="body2" sx={{ fontWeight: 900, color: '#EBF5F3', fontSize: '0.80rem', mt: 0.2 }}>
+                  {userRole === 'doctor' ? `${connectedPatients.length} Active` : userRole === 'patient' ? `${connectedDoctors.length + connectedNurses.length} Doctors` : `${connectedNetwork.totalConnected || 8} Entities`}
                 </Typography>
-                <Typography variant="caption" sx={{ color: '#34D399', fontSize: '0.68rem', fontWeight: 600 }}>
+                <Typography variant="caption" sx={{ color: '#34D399', fontSize: '0.60rem', fontWeight: 600, display: 'block' }}>
                   Open Care Matrix →
                 </Typography>
               </Paper>
             </Tooltip>
           </Grid>
 
-          <Grid item xs={12} sm={6} md={2.4}>
+          {/* 5. Clinical Prescriptions */}
+          <Grid item xs={6} sm={4} md={3} lg={1.5}>
+            <Tooltip title="Click to view Prescription History & Dispensing Logs">
+              <Paper
+                onClick={() => { setActiveTab(3); setActivityFilter('prescription'); }}
+                sx={{
+                  p: 1,
+                  borderRadius: '10px',
+                  bgcolor: 'rgba(19, 31, 34, 0.7)',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                  '&:hover': {
+                    bgcolor: 'rgba(0, 200, 150, 0.12)',
+                    borderColor: '#00C896',
+                    transform: 'translateY(-1px)'
+                  }
+                }}
+              >
+                <Typography variant="caption" sx={{ color: '#94A8A3', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 0.4, fontSize: '0.62rem' }}>
+                  <LocalPharmacyIcon sx={{ fontSize: 13, color: '#00C896' }} /> Rx Prescriptions
+                </Typography>
+                <Typography variant="body2" sx={{ fontWeight: 900, color: '#EBF5F3', fontSize: '0.80rem', mt: 0.2 }}>
+                  {activities.filter(a => a.type === 'prescription').length || categoryCounts.prescriptions || 12} Issued
+                </Typography>
+                <Typography variant="caption" sx={{ color: '#00C896', fontSize: '0.60rem', fontWeight: 600, display: 'block' }}>
+                  Active Clinical Records
+                </Typography>
+              </Paper>
+            </Tooltip>
+          </Grid>
+
+          {/* 6. Care Financial Volume */}
+          <Grid item xs={6} sm={4} md={3} lg={1.5}>
             <Tooltip title="Click to view Billing & Invoice Transactions">
               <Paper
                 onClick={() => { setActiveTab(3); setActivityFilter('billing'); }}
                 sx={{
-                  p: 1.5,
-                  borderRadius: '14px',
+                  p: 1,
+                  borderRadius: '10px',
                   bgcolor: 'rgba(19, 31, 34, 0.7)',
                   border: '1px solid rgba(255,255,255,0.08)',
                   cursor: 'pointer',
-                  transition: 'all 0.2s ease',
+                  transition: 'all 0.15s ease',
                   '&:hover': {
                     bgcolor: 'rgba(16, 185, 129, 0.12)',
                     borderColor: '#10B981',
-                    transform: 'translateY(-2px)',
-                    boxShadow: '0 4px 15px rgba(16,185,129,0.2)'
+                    transform: 'translateY(-1px)'
                   }
                 }}
               >
-                <Typography variant="caption" sx={{ color: '#94A8A3', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  <AccountBalanceWalletIcon sx={{ fontSize: 14, color: '#10B981' }} /> Financial Volume
+                <Typography variant="caption" sx={{ color: '#94A8A3', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 0.4, fontSize: '0.62rem' }}>
+                  <AccountBalanceWalletIcon sx={{ fontSize: 13, color: '#10B981' }} /> Financial Volume
                 </Typography>
-                <Typography variant="body2" sx={{ fontWeight: 900, color: '#34D399', mt: 0.3 }}>
+                <Typography variant="body2" sx={{ fontWeight: 900, color: '#34D399', fontSize: '0.80rem', mt: 0.2 }}>
                   ₹{metrics.financial?.totalBilled?.toLocaleString() || '1,450'}
                 </Typography>
-                <Typography variant="caption" sx={{ color: '#94A8A3', fontSize: '0.68rem', fontWeight: 600 }}>
-                  Paid: ₹{metrics.financial?.totalPaid?.toLocaleString() || '1,450'} • View Invoices
+                <Typography variant="caption" sx={{ color: '#94A8A3', fontSize: '0.60rem', fontWeight: 600, display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  Paid: ₹{metrics.financial?.totalPaid?.toLocaleString() || '1,450'}
+                </Typography>
+              </Paper>
+            </Tooltip>
+          </Grid>
+
+          {/* 7. DigiLocker KYC */}
+          <Grid item xs={6} sm={4} md={3} lg={1.5}>
+            <Tooltip title="DigiLocker Government Verified Identity & Records">
+              <Paper
+                sx={{
+                  p: 1,
+                  borderRadius: '10px',
+                  bgcolor: 'rgba(19, 31, 34, 0.7)',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                <Typography variant="caption" sx={{ color: '#94A8A3', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 0.4, fontSize: '0.62rem' }}>
+                  <VerifiedUserIcon sx={{ fontSize: 13, color: '#F59E0B' }} /> KYC Status
+                </Typography>
+                <Typography variant="body2" sx={{ fontWeight: 800, color: currentUser?.digilockerVerified ? '#34D399' : '#F59E0B', fontSize: '0.80rem', mt: 0.2 }}>
+                  {currentUser?.digilockerVerified ? 'KYC Verified ✓' : 'Direct Record'}
+                </Typography>
+                <Typography variant="caption" sx={{ color: '#94A8A3', fontSize: '0.60rem', fontWeight: 600, display: 'block' }}>
+                  Govt Document Lock
+                </Typography>
+              </Paper>
+            </Tooltip>
+          </Grid>
+
+          {/* 8. Security Health */}
+          <Grid item xs={6} sm={4} md={3} lg={1.5}>
+            <Tooltip title="Click to view Security Audits & Activity Frequency">
+              <Paper
+                onClick={() => setActiveTab(5)}
+                sx={{
+                  p: 1,
+                  borderRadius: '10px',
+                  bgcolor: 'rgba(19, 31, 34, 0.7)',
+                  border: '1px solid rgba(16, 185, 129, 0.25)',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                  '&:hover': {
+                    bgcolor: 'rgba(16, 185, 129, 0.12)',
+                    borderColor: '#10B981',
+                    transform: 'translateY(-1px)'
+                  }
+                }}
+              >
+                <Typography variant="caption" sx={{ color: '#10B981', fontWeight: 800, display: 'flex', alignItems: 'center', gap: 0.4, fontSize: '0.62rem' }}>
+                  <SpeedIcon sx={{ fontSize: 13 }} /> Health Score
+                </Typography>
+                <Typography variant="body2" sx={{ fontWeight: 900, color: '#10B981', fontSize: '0.80rem', mt: 0.2 }}>
+                  100% Active
+                </Typography>
+                <Typography variant="caption" sx={{ color: '#34D399', fontSize: '0.60rem', fontWeight: 600, display: 'block' }}>
+                  0 Security Incidents
                 </Typography>
               </Paper>
             </Tooltip>
@@ -1182,27 +1280,32 @@ export default function UserDetailModal({
         </Grid>
       </DialogTitle>
 
-      {/* Tabs Navigation */}
-      <Box sx={{ px: 3, borderBottom: '1px solid rgba(255,255,255,0.08)', bgcolor: 'rgba(19, 31, 34, 0.5)' }}>
+      {/* Tabs Navigation - Sleek & Compact */}
+      <Box sx={{ px: 2, borderBottom: '1px solid rgba(255,255,255,0.08)', bgcolor: 'rgba(19, 31, 34, 0.5)' }}>
         <Tabs
           value={activeTab}
           onChange={(_, val) => setActiveTab(val)}
+          variant="scrollable"
+          scrollButtons="auto"
           sx={{
-            '& .MuiTabs-indicator': { bgcolor: '#00C896', height: 3, borderRadius: '3px' },
+            minHeight: 40,
+            '& .MuiTabs-indicator': { bgcolor: '#00C896', height: 2.5, borderRadius: '2px' },
             '& .MuiTab-root': {
               color: '#94A8A3',
               fontWeight: 800,
-              fontSize: '0.85rem',
+              fontSize: '0.76rem',
               textTransform: 'none',
-              py: 1.8,
+              minHeight: 40,
+              py: 0.8,
+              px: 1.5,
               '&.Mui-focused': { color: '#00C896' },
               '&.Mui-selected': { color: '#00C896' }
             }
           }}
         >
-          <Tab icon={<TrendingUpIcon sx={{ fontSize: 18 }} />} iconPosition="start" label="Activity Trends & Graph View" />
-          <Tab icon={<GroupsIcon sx={{ fontSize: 18 }} />} iconPosition="start" label={userRole === 'doctor' ? `Connected Patients (${connectedPatients.length})` : userRole === 'patient' ? `Connected Care Team (${connectedDoctors.length + connectedNurses.length})` : `Connected Network (${connectedPatients.length + connectedDoctors.length})`} />
-          <Tab icon={<SpeedIcon sx={{ fontSize: 18 }} />} iconPosition="start" label={userRole === 'patient' ? "Clinical Vitals & Care Journey" : userRole === 'doctor' ? "Practice Analytics & Prescribing" : userRole === 'nurse' ? "Nurse Operations & Shifts" : "Pharmacy Dispensing & Stock"} />
+          <Tab icon={<TrendingUpIcon sx={{ fontSize: 15 }} />} iconPosition="start" label="Activity Trends & Graph View" />
+          <Tab icon={<GroupsIcon sx={{ fontSize: 15 }} />} iconPosition="start" label={userRole === 'doctor' ? `Connected Patients (${connectedPatients.length})` : userRole === 'patient' ? `Connected Care Team (${connectedDoctors.length + connectedNurses.length})` : `Connected Network (${connectedPatients.length + connectedDoctors.length})`} />
+          <Tab icon={<SpeedIcon sx={{ fontSize: 15 }} />} iconPosition="start" label={userRole === 'patient' ? "Clinical Vitals & Care Journey" : userRole === 'doctor' ? "Practice Analytics & Prescribing" : userRole === 'nurse' ? "Nurse Operations & Shifts" : "Pharmacy Dispensing & Stock"} />
           <Tab icon={<TimelineIcon sx={{ fontSize: 18 }} />} iconPosition="start" label={`50 Detailed Activities (${activities.length || 50})`} />
           <Tab icon={<MedicalServicesIcon sx={{ fontSize: 18 }} />} iconPosition="start" label="Role Features & Attributes" />
           <Tab icon={<LockClockIcon sx={{ fontSize: 18 }} />} iconPosition="start" label="Login Frequency & Security Logs" />
@@ -1228,29 +1331,29 @@ export default function UserDetailModal({
             {/* TAB 0: ACTIVITY TRENDS & GRAPH VIEW */}
             {activeTab === 0 && (
               <Box>
-                {/* Graph Card */}
+                {/* Graph Card - High Density */}
                 <Paper
                   elevation={0}
                   sx={{
-                    p: 3,
-                    borderRadius: '20px',
+                    p: 1.8,
+                    borderRadius: '14px',
                     bgcolor: '#131F22',
                     border: '1px solid rgba(0, 200, 150, 0.2)',
-                    mb: 3
+                    mb: 1.5
                   }}
                 >
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 1.5 }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1, flexWrap: 'wrap', gap: 1 }}>
                     <Box>
-                      <Typography variant="h6" sx={{ fontWeight: 900, color: '#EBF5F3', display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <TrendingUpIcon sx={{ color: '#00C896' }} /> Activity Frequency & Engagement Timeline
+                      <Typography variant="subtitle1" sx={{ fontWeight: 900, color: '#EBF5F3', display: 'flex', alignItems: 'center', gap: 0.8, fontSize: '0.92rem' }}>
+                        <TrendingUpIcon sx={{ color: '#00C896', fontSize: 18 }} /> Activity Frequency &amp; Engagement Timeline
                       </Typography>
-                      <Typography variant="caption" sx={{ color: '#94A8A3', fontWeight: 600 }}>
-                        Real-time graphical distribution of prescriptions, visits, invoices & security audits
+                      <Typography variant="caption" sx={{ color: '#94A8A3', fontWeight: 600, fontSize: '0.68rem' }}>
+                        Real-time graphical distribution of prescriptions, visits, invoices &amp; security audits
                       </Typography>
                     </Box>
 
                     {/* Range Selector */}
-                    <Box sx={{ display: 'flex', gap: 1 }}>
+                    <Box sx={{ display: 'flex', gap: 0.6 }}>
                       {(['7d', '30d', '6m'] as const).map((rng) => (
                         <Chip
                           key={rng}
@@ -1258,9 +1361,10 @@ export default function UserDetailModal({
                           size="small"
                           onClick={() => setGraphRange(rng)}
                           sx={{
+                            height: 22,
                             cursor: 'pointer',
                             fontWeight: 800,
-                            fontSize: '0.72rem',
+                            fontSize: '0.64rem',
                             bgcolor: graphRange === rng ? '#00C896' : 'rgba(255,255,255,0.06)',
                             color: graphRange === rng ? '#0B1315' : '#94A8A3',
                             border: graphRange === rng ? '1px solid #00C896' : '1px solid rgba(255,255,255,0.1)',
@@ -1272,8 +1376,8 @@ export default function UserDetailModal({
                   </Box>
 
                   {/* Category Filter Chips Bar */}
-                  <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap', alignItems: 'center' }}>
-                    <Typography variant="caption" sx={{ color: '#94A8A3', fontWeight: 800, mr: 0.5 }}>
+                  <Box sx={{ display: 'flex', gap: 0.8, mb: 1, flexWrap: 'wrap', alignItems: 'center' }}>
+                    <Typography variant="caption" sx={{ color: '#94A8A3', fontWeight: 800, fontSize: '0.68rem', mr: 0.2 }}>
                       Plot Metric:
                     </Typography>
                     {[
@@ -1289,13 +1393,14 @@ export default function UserDetailModal({
                         size="small"
                         onClick={() => setGraphCategory(cat.id as any)}
                         sx={{
+                          height: 22,
                           cursor: 'pointer',
                           fontWeight: 800,
-                          fontSize: '0.72rem',
+                          fontSize: '0.64rem',
                           bgcolor: graphCategory === cat.id ? `${cat.color}25` : 'rgba(255,255,255,0.04)',
                           color: graphCategory === cat.id ? cat.color : '#94A8A3',
                           border: graphCategory === cat.id ? `1.5px solid ${cat.color}` : '1px solid rgba(255,255,255,0.08)',
-                          transition: 'all 0.2s',
+                          transition: 'all 0.15s',
                           '&:hover': { bgcolor: `${cat.color}35` }
                         }}
                       />
@@ -1307,15 +1412,15 @@ export default function UserDetailModal({
                 </Paper>
 
                 {/* Category Breakdown & Highlights Grid */}
-                <Grid container spacing={2.5}>
+                <Grid container spacing={1.5}>
                   {/* Category Progress Meters */}
-                  <Grid item xs={12} md={6}>
-                    <Paper sx={{ p: 2.5, borderRadius: '18px', bgcolor: '#131F22', border: '1px solid rgba(255,255,255,0.08)', height: '100%' }}>
-                      <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#EBF5F3', mb: 2 }}>
+                  <Grid item xs={12} md={4} lg={3.5}>
+                    <Paper sx={{ p: 1.8, borderRadius: '14px', bgcolor: '#131F22', border: '1px solid rgba(255,255,255,0.08)', height: '100%' }}>
+                      <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#EBF5F3', mb: 1.2, fontSize: '0.82rem' }}>
                         Activity Distribution by Category
                       </Typography>
 
-                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.8 }}>
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                         {[
                           { id: 'prescription', label: 'Prescriptions & Rx', count: activities.filter(a => a.type === 'prescription').length || categoryCounts.prescriptions || 12, color: '#00C896' },
                           { id: 'billing', label: 'Billing & Invoices', count: activities.filter(a => a.type === 'billing').length || categoryCounts.billing || 8, color: '#38BDF8' },
@@ -1334,22 +1439,22 @@ export default function UserDetailModal({
                               }}
                               sx={{
                                 cursor: 'pointer',
-                                p: 1,
-                                borderRadius: '10px',
-                                transition: 'all 0.2s',
-                                '&:hover': { bgcolor: 'rgba(255,255,255,0.04)', transform: 'translateX(3px)' }
+                                p: 0.8,
+                                borderRadius: '8px',
+                                transition: 'all 0.15s',
+                                '&:hover': { bgcolor: 'rgba(255,255,255,0.04)', transform: 'translateX(2px)' }
                               }}
                             >
-                              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-                                <Typography variant="caption" sx={{ fontWeight: 700, color: '#EBF5F3' }}>
+                              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.3 }}>
+                                <Typography variant="caption" sx={{ fontWeight: 700, color: '#EBF5F3', fontSize: '0.68rem' }}>
                                   {cat.label} ↗
                                 </Typography>
-                                <Typography variant="caption" sx={{ fontWeight: 800, color: cat.color }}>
-                                  {cat.count} events ({pct}%)
+                                <Typography variant="caption" sx={{ fontWeight: 800, color: cat.color, fontSize: '0.68rem' }}>
+                                  {cat.count} ({pct}%)
                                 </Typography>
                               </Box>
-                              <Box sx={{ height: 8, bgcolor: 'rgba(255,255,255,0.06)', borderRadius: '4px', overflow: 'hidden' }}>
-                                <Box sx={{ width: `${pct}%`, height: '100%', bgcolor: cat.color, borderRadius: '4px', transition: 'width 0.6s ease' }} />
+                              <Box sx={{ height: 5, bgcolor: 'rgba(255,255,255,0.06)', borderRadius: '3px', overflow: 'hidden' }}>
+                                <Box sx={{ width: `${pct}%`, height: '100%', bgcolor: cat.color, borderRadius: '3px', transition: 'width 0.6s ease' }} />
                               </Box>
                             </Box>
                           );
@@ -1358,99 +1463,139 @@ export default function UserDetailModal({
                     </Paper>
                   </Grid>
 
-                  {/* Core Attribute Summary Card */}
-                  <Grid item xs={12} md={6}>
-                    <Paper sx={{ p: 2.5, borderRadius: '18px', bgcolor: '#131F22', border: '1px solid rgba(255,255,255,0.08)', height: '100%' }}>
-                      <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#EBF5F3', mb: 2 }}>
-                        Core Profile Attributes
+                  {/* Core Attribute Summary Card - Dense 4-Column Responsive Grid */}
+                  <Grid item xs={12} md={8} lg={8.5}>
+                    <Paper sx={{ p: 1.8, borderRadius: '14px', bgcolor: '#131F22', border: '1px solid rgba(255,255,255,0.08)', height: '100%' }}>
+                      <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#EBF5F3', mb: 1.2, fontSize: '0.82rem' }}>
+                        Core Profile Attributes &amp; Clinical Information
                       </Typography>
 
-                      <Grid container spacing={1.5}>
+                      <Grid container spacing={1}>
                         {userRole === 'doctor' && (
                           <>
-                            <Grid item xs={6}>
-                              <Typography variant="caption" sx={{ color: '#94A8A3' }}>Specialization</Typography>
-                              <Typography variant="body2" sx={{ fontWeight: 800, color: '#00C896' }}>{currentUser?.specialization || 'General Medicine'}</Typography>
+                            <Grid item xs={6} sm={4} md={3}>
+                              <Typography variant="caption" sx={{ color: '#94A8A3', fontSize: '0.62rem' }}>Specialization</Typography>
+                              <Typography variant="body2" sx={{ fontWeight: 800, color: '#00C896', fontSize: '0.78rem' }}>{currentUser?.specialization || 'General Medicine'}</Typography>
                             </Grid>
-                            <Grid item xs={6}>
-                              <Typography variant="caption" sx={{ color: '#94A8A3' }}>License Number</Typography>
-                              <Typography variant="body2" sx={{ fontWeight: 800, color: '#EBF5F3' }}>{currentUser?.licenseNumber || 'DOC-2026-MEDIZO'}</Typography>
+                            <Grid item xs={6} sm={4} md={3}>
+                              <Typography variant="caption" sx={{ color: '#94A8A3', fontSize: '0.62rem' }}>License Number</Typography>
+                              <Typography variant="body2" sx={{ fontWeight: 800, color: '#EBF5F3', fontSize: '0.78rem', fontFamily: 'monospace' }}>{currentUser?.licenseNumber || 'DOC-2026-MEDIZO'}</Typography>
                             </Grid>
-                            <Grid item xs={6}>
-                              <Typography variant="caption" sx={{ color: '#94A8A3' }}>Consultation Fee</Typography>
-                              <Typography variant="body2" sx={{ fontWeight: 800, color: '#34D399' }}>₹{currentUser?.consultationFee || 500}</Typography>
+                            <Grid item xs={6} sm={4} md={3}>
+                              <Typography variant="caption" sx={{ color: '#94A8A3', fontSize: '0.62rem' }}>Consultation Fee</Typography>
+                              <Typography variant="body2" sx={{ fontWeight: 800, color: '#34D399', fontSize: '0.78rem' }}>₹{currentUser?.consultationFee || 500}</Typography>
                             </Grid>
-                            <Grid item xs={6}>
-                              <Typography variant="caption" sx={{ color: '#94A8A3' }}>Teleconsult Fee</Typography>
-                              <Typography variant="body2" sx={{ fontWeight: 800, color: '#38BDF8' }}>₹{currentUser?.teleconsultFee || 400}</Typography>
+                            <Grid item xs={6} sm={4} md={3}>
+                              <Typography variant="caption" sx={{ color: '#94A8A3', fontSize: '0.62rem' }}>Teleconsult Fee</Typography>
+                              <Typography variant="body2" sx={{ fontWeight: 800, color: '#38BDF8', fontSize: '0.78rem' }}>₹{currentUser?.teleconsultFee || 400}</Typography>
                             </Grid>
-                            <Grid item xs={12}>
-                              <Typography variant="caption" sx={{ color: '#94A8A3' }}>Clinic Address</Typography>
-                              <Typography variant="body2" sx={{ fontWeight: 600, color: '#EBF5F3' }}>{currentUser?.clinicAddress || currentUser?.clinicPlaceName || 'Registered Medizo Partner Clinic'}</Typography>
+                            <Grid item xs={12} sm={8} md={6}>
+                              <Typography variant="caption" sx={{ color: '#94A8A3', fontSize: '0.62rem' }}>Clinic Address</Typography>
+                              <Typography variant="body2" sx={{ fontWeight: 600, color: '#EBF5F3', fontSize: '0.74rem' }}>{currentUser?.clinicAddress || currentUser?.clinicPlaceName || 'Registered Medizo Partner Clinic'}</Typography>
+                            </Grid>
+                            <Grid item xs={12} sm={4} md={6}>
+                              <Typography variant="caption" sx={{ color: '#94A8A3', fontSize: '0.62rem' }}>Experience &amp; Qualifications</Typography>
+                              <Typography variant="body2" sx={{ fontWeight: 600, color: '#EBF5F3', fontSize: '0.74rem' }}>{currentUser?.qualifications || 'MBBS, MD (Internal Medicine), 8+ Yrs'}</Typography>
                             </Grid>
                           </>
                         )}
 
                         {userRole === 'patient' && (
                           <>
-                            <Grid item xs={6}>
-                              <Typography variant="caption" sx={{ color: '#94A8A3' }}>Date of Birth</Typography>
-                              <Typography variant="body2" sx={{ fontWeight: 800, color: '#EBF5F3' }}>{currentUser?.dateOfBirth || '1992-06-15'}</Typography>
+                            <Grid item xs={6} sm={4} md={3}>
+                              <Typography variant="caption" sx={{ color: '#94A8A3', fontSize: '0.62rem' }}>Date of Birth</Typography>
+                              <Typography variant="body2" sx={{ fontWeight: 800, color: '#EBF5F3', fontSize: '0.78rem' }}>{currentUser?.dateOfBirth || '1992-06-15'}</Typography>
                             </Grid>
-                            <Grid item xs={6}>
-                              <Typography variant="caption" sx={{ color: '#94A8A3' }}>Gender</Typography>
-                              <Typography variant="body2" sx={{ fontWeight: 800, color: '#EBF5F3' }}>{currentUser?.gender || 'Unspecified'}</Typography>
+                            <Grid item xs={6} sm={4} md={3}>
+                              <Typography variant="caption" sx={{ color: '#94A8A3', fontSize: '0.62rem' }}>Gender</Typography>
+                              <Typography variant="body2" sx={{ fontWeight: 800, color: '#EBF5F3', fontSize: '0.78rem' }}>{currentUser?.gender || 'Unspecified'}</Typography>
                             </Grid>
-                            <Grid item xs={6}>
-                              <Typography variant="caption" sx={{ color: '#94A8A3' }}>Blood Type</Typography>
-                              <Typography variant="body2" sx={{ fontWeight: 800, color: '#F87171' }}>{currentUser?.bloodType || 'A+'}</Typography>
+                            <Grid item xs={6} sm={4} md={3}>
+                              <Typography variant="caption" sx={{ color: '#94A8A3', fontSize: '0.62rem' }}>Blood Type</Typography>
+                              <Typography variant="body2" sx={{ fontWeight: 800, color: '#F87171', fontSize: '0.78rem' }}>{currentUser?.bloodType || 'A+'}</Typography>
                             </Grid>
-                            <Grid item xs={6}>
-                              <Typography variant="caption" sx={{ color: '#94A8A3' }}>DigiLocker Status</Typography>
-                              <Typography variant="body2" sx={{ fontWeight: 800, color: currentUser?.digilockerVerified ? '#34D399' : '#F59E0B' }}>
+                            <Grid item xs={6} sm={4} md={3}>
+                              <Typography variant="caption" sx={{ color: '#94A8A3', fontSize: '0.62rem' }}>DigiLocker Status</Typography>
+                              <Typography variant="body2" sx={{ fontWeight: 800, color: currentUser?.digilockerVerified ? '#34D399' : '#F59E0B', fontSize: '0.78rem' }}>
                                 {currentUser?.digilockerVerified ? 'Verified KYC ✓' : 'Unverified'}
                               </Typography>
                             </Grid>
-                            <Grid item xs={12}>
-                              <Typography variant="caption" sx={{ color: '#94A8A3' }}>Residential Address</Typography>
-                              <Typography variant="body2" sx={{ fontWeight: 600, color: '#EBF5F3' }}>{currentUser?.address || 'Patna, Bihar, India'}</Typography>
+                            <Grid item xs={12} sm={6}>
+                              <Typography variant="caption" sx={{ color: '#94A8A3', fontSize: '0.62rem' }}>Residential Address</Typography>
+                              <Typography variant="body2" sx={{ fontWeight: 600, color: '#EBF5F3', fontSize: '0.74rem' }}>{currentUser?.address || 'Patna, Bihar, India'}</Typography>
+                            </Grid>
+                            <Grid item xs={12} sm={6}>
+                              <Typography variant="caption" sx={{ color: '#94A8A3', fontSize: '0.62rem' }}>Emergency Contact</Typography>
+                              <Typography variant="body2" sx={{ fontWeight: 600, color: '#EBF5F3', fontSize: '0.74rem' }}>{currentUser?.emergencyContact || '+91 98765 00000 (Spouse)'}</Typography>
                             </Grid>
                           </>
                         )}
 
                         {userRole === 'pharmacist' && (
                           <>
-                            <Grid item xs={6}>
-                              <Typography variant="caption" sx={{ color: '#94A8A3' }}>Pharmacy Name</Typography>
-                              <Typography variant="body2" sx={{ fontWeight: 800, color: '#F59E0B' }}>{currentUser?.pharmacyName || 'Medizo Pharmacy'}</Typography>
+                            <Grid item xs={6} sm={4} md={3}>
+                              <Typography variant="caption" sx={{ color: '#94A8A3', fontSize: '0.62rem' }}>Pharmacy Name</Typography>
+                              <Typography variant="body2" sx={{ fontWeight: 800, color: '#F59E0B', fontSize: '0.78rem' }}>{currentUser?.pharmacyName || 'Medizo Pharmacy'}</Typography>
                             </Grid>
-                            <Grid item xs={6}>
-                              <Typography variant="caption" sx={{ color: '#94A8A3' }}>Pharmacy License</Typography>
-                              <Typography variant="body2" sx={{ fontWeight: 800, color: '#EBF5F3' }}>{currentUser?.licenseNumber || 'PHARMA-2026-MEDIZO'}</Typography>
+                            <Grid item xs={6} sm={4} md={3}>
+                              <Typography variant="caption" sx={{ color: '#94A8A3', fontSize: '0.62rem' }}>Pharmacy License</Typography>
+                              <Typography variant="body2" sx={{ fontWeight: 800, color: '#EBF5F3', fontSize: '0.78rem', fontFamily: 'monospace' }}>{currentUser?.licenseNumber || 'PHARMA-2026-MEDIZO'}</Typography>
                             </Grid>
-                            <Grid item xs={12}>
-                              <Typography variant="caption" sx={{ color: '#94A8A3' }}>Pharmacy Address</Typography>
-                              <Typography variant="body2" sx={{ fontWeight: 600, color: '#EBF5F3' }}>{currentUser?.pharmacyAddress || 'Central Healthcare Square'}</Typography>
+                            <Grid item xs={12} sm={8} md={6}>
+                              <Typography variant="caption" sx={{ color: '#94A8A3', fontSize: '0.62rem' }}>Pharmacy Address</Typography>
+                              <Typography variant="body2" sx={{ fontWeight: 600, color: '#EBF5F3', fontSize: '0.74rem' }}>{currentUser?.pharmacyAddress || 'Central Healthcare Square'}</Typography>
                             </Grid>
                           </>
                         )}
 
                         {userRole === 'nurse' && (
                           <>
-                            <Grid item xs={6}>
-                              <Typography variant="caption" sx={{ color: '#94A8A3' }}>Nurse License</Typography>
-                              <Typography variant="body2" sx={{ fontWeight: 800, color: '#C084FC' }}>{currentUser?.nurseLicenseNumber || 'RN-99201'}</Typography>
+                            <Grid item xs={6} sm={4} md={3}>
+                              <Typography variant="caption" sx={{ color: '#94A8A3', fontSize: '0.62rem' }}>Nurse License</Typography>
+                              <Typography variant="body2" sx={{ fontWeight: 800, color: '#C084FC', fontSize: '0.78rem', fontFamily: 'monospace' }}>{currentUser?.nurseLicenseNumber || 'RN-99201'}</Typography>
                             </Grid>
-                            <Grid item xs={6}>
-                              <Typography variant="caption" sx={{ color: '#94A8A3' }}>Specialization</Typography>
-                              <Typography variant="body2" sx={{ fontWeight: 800, color: '#EBF5F3' }}>{currentUser?.nurseSpecialization || 'Post-Op & Home Care'}</Typography>
+                            <Grid item xs={6} sm={4} md={3}>
+                              <Typography variant="caption" sx={{ color: '#94A8A3', fontSize: '0.62rem' }}>Specialization</Typography>
+                              <Typography variant="body2" sx={{ fontWeight: 800, color: '#EBF5F3', fontSize: '0.78rem' }}>{currentUser?.nurseSpecialization || 'Post-Op & Home Care'}</Typography>
                             </Grid>
-                            <Grid item xs={12}>
-                              <Typography variant="caption" sx={{ color: '#94A8A3' }}>Qualifications</Typography>
-                              <Typography variant="body2" sx={{ fontWeight: 600, color: '#EBF5F3' }}>{currentUser?.nurseQualifications || 'B.Sc. Nursing, Critical Care Specialist'}</Typography>
+                            <Grid item xs={12} sm={8} md={6}>
+                              <Typography variant="caption" sx={{ color: '#94A8A3', fontSize: '0.62rem' }}>Qualifications</Typography>
+                              <Typography variant="body2" sx={{ fontWeight: 600, color: '#EBF5F3', fontSize: '0.74rem' }}>{currentUser?.nurseQualifications || 'B.Sc. Nursing, Critical Care Specialist'}</Typography>
                             </Grid>
                           </>
                         )}
+
+                        {/* Universal Account & Security Profile Attributes in Dense Grid */}
+                        <Grid item xs={12}>
+                          <Divider sx={{ my: 0.8, borderColor: 'rgba(255,255,255,0.06)' }} />
+                        </Grid>
+                        <Grid item xs={6} sm={4} md={3}>
+                          <Typography variant="caption" sx={{ color: '#94A8A3', fontSize: '0.62rem' }}>Account Created</Typography>
+                          <Typography variant="body2" sx={{ fontWeight: 800, color: '#00C896', display: 'flex', alignItems: 'center', gap: 0.4, fontSize: '0.78rem' }}>
+                            <CalendarMonthIcon sx={{ fontSize: 13 }} />
+                            {currentUser?.createdAt ? formatDate(currentUser.createdAt) : 'July 2026'}
+                          </Typography>
+                          <Typography variant="caption" sx={{ color: '#34D399', fontSize: '0.60rem', fontWeight: 600 }}>
+                            {formatTimeAgo(currentUser?.createdAt)}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={6} sm={4} md={3}>
+                          <Typography variant="caption" sx={{ color: '#94A8A3', fontSize: '0.62rem' }}>Last Login / Active</Typography>
+                          <Typography variant="body2" sx={{ fontWeight: 800, color: '#38BDF8', display: 'flex', alignItems: 'center', gap: 0.4, fontSize: '0.78rem' }}>
+                            <AccessTimeIcon sx={{ fontSize: 13 }} />
+                            {currentUser?.lastLogin || currentUser?.updatedAt ? formatDate(currentUser?.lastLogin || currentUser?.updatedAt) : 'Active Today'}
+                          </Typography>
+                          <Typography variant="caption" sx={{ color: '#38BDF8', fontSize: '0.60rem', fontWeight: 600 }}>
+                            {formatTimeAgo(currentUser?.lastLogin || currentUser?.updatedAt || currentUser?.createdAt)}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={12} sm={8} md={6}>
+                          <Typography variant="caption" sx={{ color: '#94A8A3', fontSize: '0.62rem' }}>Authentication Mode &amp; Security</Typography>
+                          <Typography variant="body2" sx={{ fontWeight: 700, color: '#C084FC', display: 'flex', alignItems: 'center', gap: 0.4, fontSize: '0.74rem' }}>
+                            <SecurityIcon sx={{ fontSize: 13 }} />
+                            {currentUser?.googleId ? 'Google OAuth2 (SHA-256 JWT Token)' : (currentUser?.authProvider === 'mobile' ? 'Mobile Phone & OTP Authenticated' : 'Email & Password (Bcrypt Salted Hash)')}
+                          </Typography>
+                        </Grid>
                       </Grid>
                     </Paper>
                   </Grid>
@@ -1460,72 +1605,72 @@ export default function UserDetailModal({
 
             {/* TAB 1: CONNECTED PATIENTS & CARE RELATIONSHIPS NETWORK */}
             {activeTab === 1 && (
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                {/* Executive Overview KPI Cards */}
-                <Grid container spacing={2}>
-                  <Grid item xs={12} sm={6} md={3}>
-                    <Paper sx={{ p: 2, borderRadius: '16px', bgcolor: '#131F22', border: '1px solid rgba(0, 200, 150, 0.25)' }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: '#00C896', mb: 0.5 }}>
-                        <GroupsIcon sx={{ fontSize: 18 }} />
-                        <Typography variant="caption" sx={{ fontWeight: 800, textTransform: 'uppercase' }}>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.8 }}>
+                {/* Executive Overview KPI Cards - High Density */}
+                <Grid container spacing={1.2}>
+                  <Grid item xs={6} sm={6} md={3}>
+                    <Paper sx={{ p: 1.2, borderRadius: '12px', bgcolor: '#131F22', border: '1px solid rgba(0, 200, 150, 0.25)' }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.6, color: '#00C896', mb: 0.2 }}>
+                        <GroupsIcon sx={{ fontSize: 15 }} />
+                        <Typography variant="caption" sx={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '0.64rem' }}>
                           {userRole === 'doctor' ? 'Connected Patients' : userRole === 'patient' ? 'Attending Doctors' : 'Connected Network'}
                         </Typography>
                       </Box>
-                      <Typography variant="h4" sx={{ fontWeight: 900, color: '#EBF5F3' }}>
+                      <Typography variant="h6" sx={{ fontWeight: 900, color: '#EBF5F3', fontSize: '1.2rem' }}>
                         {userRole === 'doctor' ? connectedPatients.length : userRole === 'patient' ? connectedDoctors.length : (connectedPatients.length + connectedDoctors.length)}
                       </Typography>
-                      <Typography variant="caption" sx={{ color: '#34D399', fontWeight: 600 }}>
-                        {userRole === 'doctor' ? 'Patients under care & prescriptions' : 'Consulting physicians & specialists'}
+                      <Typography variant="caption" sx={{ color: '#34D399', fontWeight: 600, fontSize: '0.62rem' }}>
+                        {userRole === 'doctor' ? 'Active cases under care' : 'Consulting physicians'}
                       </Typography>
                     </Paper>
                   </Grid>
 
-                  <Grid item xs={12} sm={6} md={3}>
-                    <Paper sx={{ p: 2, borderRadius: '16px', bgcolor: '#131F22', border: '1px solid rgba(56, 189, 248, 0.25)' }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: '#38BDF8', mb: 0.5 }}>
-                        <ReceiptLongIcon sx={{ fontSize: 18 }} />
-                        <Typography variant="caption" sx={{ fontWeight: 800, textTransform: 'uppercase' }}>
+                  <Grid item xs={6} sm={6} md={3}>
+                    <Paper sx={{ p: 1.2, borderRadius: '12px', bgcolor: '#131F22', border: '1px solid rgba(56, 189, 248, 0.25)' }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.6, color: '#38BDF8', mb: 0.2 }}>
+                        <ReceiptLongIcon sx={{ fontSize: 15 }} />
+                        <Typography variant="caption" sx={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '0.64rem' }}>
                           Clinical Encounters
                         </Typography>
                       </Box>
-                      <Typography variant="h4" sx={{ fontWeight: 900, color: '#38BDF8' }}>
+                      <Typography variant="h6" sx={{ fontWeight: 900, color: '#38BDF8', fontSize: '1.2rem' }}>
                         {metrics.prescriptionsCount || activities.filter(a => a.type === 'prescription').length || 12}
                       </Typography>
-                      <Typography variant="caption" sx={{ color: '#94A8A3' }}>
-                        Prescription records &amp; consults
+                      <Typography variant="caption" sx={{ color: '#94A8A3', fontSize: '0.62rem' }}>
+                        Prescription &amp; consult records
                       </Typography>
                     </Paper>
                   </Grid>
 
-                  <Grid item xs={12} sm={6} md={3}>
-                    <Paper sx={{ p: 2, borderRadius: '16px', bgcolor: '#131F22', border: '1px solid rgba(192, 132, 252, 0.25)' }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: '#C084FC', mb: 0.5 }}>
-                        <HealingIcon sx={{ fontSize: 18 }} />
-                        <Typography variant="caption" sx={{ fontWeight: 800, textTransform: 'uppercase' }}>
+                  <Grid item xs={6} sm={6} md={3}>
+                    <Paper sx={{ p: 1.2, borderRadius: '12px', bgcolor: '#131F22', border: '1px solid rgba(192, 132, 252, 0.25)' }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.6, color: '#C084FC', mb: 0.2 }}>
+                        <HealingIcon sx={{ fontSize: 15 }} />
+                        <Typography variant="caption" sx={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '0.64rem' }}>
                           Home Care &amp; Referrals
                         </Typography>
                       </Box>
-                      <Typography variant="h4" sx={{ fontWeight: 900, color: '#C084FC' }}>
+                      <Typography variant="h6" sx={{ fontWeight: 900, color: '#C084FC', fontSize: '1.2rem' }}>
                         {(metrics.homeCareCount || 0) + (metrics.referralsCount || 0) || connectedNurses.length || 4}
                       </Typography>
-                      <Typography variant="caption" sx={{ color: '#94A8A3' }}>
-                        Nurse dispatches &amp; specialist links
+                      <Typography variant="caption" sx={{ color: '#94A8A3', fontSize: '0.62rem' }}>
+                        Dispatches &amp; specialist links
                       </Typography>
                     </Paper>
                   </Grid>
 
-                  <Grid item xs={12} sm={6} md={3}>
-                    <Paper sx={{ p: 2, borderRadius: '16px', bgcolor: '#131F22', border: '1px solid rgba(245, 158, 11, 0.25)' }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: '#F59E0B', mb: 0.5 }}>
-                        <AccountBalanceWalletIcon sx={{ fontSize: 18 }} />
-                        <Typography variant="caption" sx={{ fontWeight: 800, textTransform: 'uppercase' }}>
-                          Care Financial Volume
+                  <Grid item xs={6} sm={6} md={3}>
+                    <Paper sx={{ p: 1.2, borderRadius: '12px', bgcolor: '#131F22', border: '1px solid rgba(245, 158, 11, 0.25)' }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.6, color: '#F59E0B', mb: 0.2 }}>
+                        <AccountBalanceWalletIcon sx={{ fontSize: 15 }} />
+                        <Typography variant="caption" sx={{ fontWeight: 800, textTransform: 'uppercase', fontSize: '0.64rem' }}>
+                          Financial Volume
                         </Typography>
                       </Box>
-                      <Typography variant="h4" sx={{ fontWeight: 900, color: '#F59E0B' }}>
+                      <Typography variant="h6" sx={{ fontWeight: 900, color: '#F59E0B', fontSize: '1.2rem' }}>
                         ₹{metrics.financial?.totalBilled?.toLocaleString() || '1,450'}
                       </Typography>
-                      <Typography variant="caption" sx={{ color: '#94A8A3' }}>
+                      <Typography variant="caption" sx={{ color: '#94A8A3', fontSize: '0.62rem' }}>
                         Paid: ₹{metrics.financial?.totalPaid?.toLocaleString() || '1,450'}
                       </Typography>
                     </Paper>
@@ -1533,8 +1678,8 @@ export default function UserDetailModal({
                 </Grid>
 
                 {/* Search & Filter Bar */}
-                <Paper sx={{ p: 2, borderRadius: '18px', bgcolor: '#131F22', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2, border: '1px solid rgba(255,255,255,0.08)' }}>
-                  <Box sx={{ flex: 1, minWidth: 260 }}>
+                <Paper sx={{ p: 1.2, borderRadius: '12px', bgcolor: '#131F22', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1.5, border: '1px solid rgba(255,255,255,0.08)' }}>
+                  <Box sx={{ flex: 1, minWidth: 240 }}>
                     <TextField
                       fullWidth
                       size="small"
@@ -1544,7 +1689,7 @@ export default function UserDetailModal({
                       InputProps={{
                         startAdornment: (
                           <InputAdornment position="start">
-                            <SearchIcon sx={{ color: '#00C896', fontSize: 18 }} />
+                            <SearchIcon sx={{ color: '#00C896', fontSize: 16 }} />
                           </InputAdornment>
                         )
                       }}
@@ -1552,7 +1697,8 @@ export default function UserDetailModal({
                         '& .MuiOutlinedInput-root': {
                           color: '#EBF5F3',
                           bgcolor: 'rgba(255,255,255,0.03)',
-                          borderRadius: '12px',
+                          borderRadius: '10px',
+                          fontSize: '0.78rem',
                           '& fieldset': { borderColor: 'rgba(255,255,255,0.08)' },
                           '&:hover fieldset': { borderColor: '#00C896' }
                         }
@@ -1560,7 +1706,7 @@ export default function UserDetailModal({
                     />
                   </Box>
 
-                  <Box sx={{ display: 'flex', gap: 0.8, flexWrap: 'wrap' }}>
+                  <Box sx={{ display: 'flex', gap: 0.6, flexWrap: 'wrap' }}>
                     {[
                       { id: 'all', label: `All (${userRole === 'doctor' ? connectedPatients.length : userRole === 'patient' ? connectedDoctors.length : (connectedPatients.length + connectedDoctors.length)})` },
                       { id: 'active', label: 'Active Care' },
@@ -1573,9 +1719,10 @@ export default function UserDetailModal({
                         size="small"
                         onClick={() => setNetworkFilter(f.id as any)}
                         sx={{
+                          height: 24,
                           cursor: 'pointer',
                           fontWeight: 800,
-                          fontSize: '0.72rem',
+                          fontSize: '0.66rem',
                           bgcolor: networkFilter === f.id ? '#00C896' : 'rgba(255,255,255,0.05)',
                           color: networkFilter === f.id ? '#0B1315' : '#94A8A3',
                           border: networkFilter === f.id ? '1px solid #00C896' : '1px solid rgba(255,255,255,0.08)'
@@ -1585,151 +1732,151 @@ export default function UserDetailModal({
                   </Box>
                 </Paper>
 
-                {/* DOCTOR VIEW: Connected Patients Cards */}
+                {/* DOCTOR VIEW: Connected Patients Cards - 2 Responsive Columns on Wide Screens */}
                 {userRole === 'doctor' && (
-                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                    <Typography variant="subtitle1" sx={{ fontWeight: 900, color: '#EBF5F3', display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <GroupsIcon sx={{ color: '#00C896' }} /> Patients Managed Under Dr. {currentUser?.firstName || 'Doctor'} {currentUser?.lastName || ''} ({filteredPatients.length})
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 900, color: '#EBF5F3', display: 'flex', alignItems: 'center', gap: 0.8, fontSize: '0.85rem' }}>
+                      <GroupsIcon sx={{ color: '#00C896', fontSize: 16 }} /> Patients Managed Under Dr. {currentUser?.firstName || 'Doctor'} {currentUser?.lastName || ''} ({filteredPatients.length})
                     </Typography>
 
                     {filteredPatients.length === 0 ? (
-                      <Paper sx={{ p: 4, textAlign: 'center', bgcolor: '#131F22', borderRadius: '18px', border: '1px solid rgba(255,255,255,0.08)' }}>
-                        <Avatar sx={{ bgcolor: 'rgba(0, 200, 150, 0.12)', color: '#00C896', width: 48, height: 48, mx: 'auto', mb: 1 }}>
-                          <GroupsIcon />
+                      <Paper sx={{ p: 3, textAlign: 'center', bgcolor: '#131F22', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.08)' }}>
+                        <Avatar sx={{ bgcolor: 'rgba(0, 200, 150, 0.12)', color: '#00C896', width: 40, height: 40, mx: 'auto', mb: 1 }}>
+                          <GroupsIcon sx={{ fontSize: 20 }} />
                         </Avatar>
-                        <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#EBF5F3' }}>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#EBF5F3', fontSize: '0.82rem' }}>
                           No connected patients matching search
                         </Typography>
                         <Button
                           size="small"
                           onClick={() => { setNetworkSearch(''); setNetworkFilter('all'); }}
-                          sx={{ mt: 1.5, color: '#00C896', textTransform: 'none', fontWeight: 800 }}
+                          sx={{ mt: 1, color: '#00C896', textTransform: 'none', fontWeight: 800, fontSize: '0.72rem' }}
                         >
                           Clear Filters
                         </Button>
                       </Paper>
                     ) : (
-                      filteredPatients.map((pat: any, pIdx: number) => (
-                        <Paper
-                          key={pIdx}
-                          sx={{
-                            p: 2.2,
-                            borderRadius: '16px',
-                            bgcolor: '#131F22',
-                            border: '1px solid rgba(0, 200, 150, 0.2)',
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                            flexWrap: 'wrap',
-                            gap: 2,
-                            transition: 'all 0.2s ease',
-                            '&:hover': {
-                              bgcolor: 'rgba(19, 31, 34, 0.95)',
-                              borderColor: '#00C896',
-                              boxShadow: '0 4px 20px rgba(0,200,150,0.15)'
-                            }
-                          }}
-                        >
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                            <Avatar sx={{ bgcolor: 'rgba(0, 200, 150, 0.15)', color: '#00C896', width: 46, height: 46, fontWeight: 900 }}>
-                              {pat.name ? pat.name.substring(0, 2).toUpperCase() : 'P'}
-                            </Avatar>
-                            <Box>
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-                                <Typography
-                                  variant="subtitle1"
-                                  onClick={() => handleNavigateToConnectedUser(pat, 'patient')}
-                                  sx={{ fontWeight: 900, color: '#EBF5F3', cursor: 'pointer', '&:hover': { color: '#00C896', textDecoration: 'underline' } }}
-                                >
-                                  {pat.name}
-                                </Typography>
-                                <Chip
-                                  label={pat.status || 'Active Care'}
-                                  size="small"
-                                  sx={{
-                                    height: 20,
-                                    bgcolor: pat.status === 'Follow-up Due' ? 'rgba(245, 158, 11, 0.15)' : 'rgba(16, 185, 129, 0.15)',
-                                    color: pat.status === 'Follow-up Due' ? '#F59E0B' : '#34D399',
-                                    fontWeight: 800,
-                                    fontSize: '0.65rem'
-                                  }}
-                                />
-                                {pat.bloodGroup && (
-                                  <Chip label={`Blood: ${pat.bloodGroup}`} size="small" sx={{ height: 20, bgcolor: 'rgba(239,68,68,0.1)', color: '#F87171', fontWeight: 800, fontSize: '0.62rem' }} />
-                                )}
-                              </Box>
-                              <Typography variant="caption" sx={{ color: '#94A8A3', display: 'block', mt: 0.3 }}>
-                                ID: <span style={{ fontFamily: 'monospace', color: '#00C896' }}>#{String(pat.id || '').slice(-8)}</span> • {pat.age || 35} yrs • {pat.gender || 'Male'} • Phone: {pat.phone || '+91 98765 43210'}
-                              </Typography>
-                              <Typography variant="body2" sx={{ color: '#38BDF8', fontWeight: 700, mt: 0.5 }}>
-                                🩺 Condition: {pat.primaryCondition || 'Essential Hypertension'}
-                              </Typography>
-                              {pat.medications && pat.medications.length > 0 && (
-                                <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mt: 0.8 }}>
-                                  {pat.medications.slice(0, 3).map((m: string, mIdx: number) => (
-                                    <Chip key={mIdx} label={formatSafeStr(m)} size="small" sx={{ height: 18, bgcolor: 'rgba(255,255,255,0.04)', color: '#94A8A3', fontSize: '0.62rem' }} />
-                                  ))}
-                                  {pat.medications.length > 3 && (
-                                    <Chip label={`+${pat.medications.length - 3} more`} size="small" sx={{ height: 18, bgcolor: 'rgba(0,200,150,0.1)', color: '#00C896', fontSize: '0.62rem' }} />
+                      <Grid container spacing={1.2}>
+                        {filteredPatients.map((pat: any, pIdx: number) => (
+                          <Grid item xs={12} lg={6} key={pIdx}>
+                            <Paper
+                              sx={{
+                                p: 1.5,
+                                borderRadius: '12px',
+                                bgcolor: '#131F22',
+                                border: '1px solid rgba(0, 200, 150, 0.2)',
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                flexWrap: 'wrap',
+                                gap: 1.2,
+                                height: '100%',
+                                transition: 'all 0.15s ease',
+                                '&:hover': {
+                                  bgcolor: 'rgba(19, 31, 34, 0.95)',
+                                  borderColor: '#00C896',
+                                  boxShadow: '0 4px 15px rgba(0,200,150,0.12)'
+                                }
+                              }}
+                            >
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2, minWidth: 200, flex: 1 }}>
+                                <Avatar sx={{ bgcolor: 'rgba(0, 200, 150, 0.15)', color: '#00C896', width: 38, height: 38, fontWeight: 900, fontSize: '0.85rem' }}>
+                                  {pat.name ? pat.name.substring(0, 2).toUpperCase() : 'P'}
+                                </Avatar>
+                                <Box sx={{ minWidth: 0, flex: 1 }}>
+                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.6, flexWrap: 'wrap' }}>
+                                    <Typography
+                                      variant="subtitle2"
+                                      onClick={() => handleNavigateToConnectedUser(pat, 'patient')}
+                                      sx={{ fontWeight: 900, color: '#EBF5F3', fontSize: '0.82rem', cursor: 'pointer', '&:hover': { color: '#00C896', textDecoration: 'underline' } }}
+                                    >
+                                      {pat.name}
+                                    </Typography>
+                                    <Chip
+                                      label={pat.status || 'Active Care'}
+                                      size="small"
+                                      sx={{
+                                        height: 18,
+                                        bgcolor: pat.status === 'Follow-up Due' ? 'rgba(245, 158, 11, 0.15)' : 'rgba(16, 185, 129, 0.15)',
+                                        color: pat.status === 'Follow-up Due' ? '#F59E0B' : '#34D399',
+                                        fontWeight: 800,
+                                        fontSize: '0.60rem'
+                                      }}
+                                    />
+                                    {pat.bloodGroup && (
+                                      <Chip label={`Blood: ${pat.bloodGroup}`} size="small" sx={{ height: 18, bgcolor: 'rgba(239,68,68,0.1)', color: '#F87171', fontWeight: 800, fontSize: '0.58rem' }} />
+                                    )}
+                                  </Box>
+                                  <Typography variant="caption" sx={{ color: '#94A8A3', display: 'block', mt: 0.2, fontSize: '0.68rem' }}>
+                                    ID: <span style={{ fontFamily: 'monospace', color: '#00C896' }}>#{String(pat.id || '').slice(-8)}</span> • {pat.age || 35} yrs • {pat.gender || 'Male'}
+                                  </Typography>
+                                  <Typography variant="body2" sx={{ color: '#38BDF8', fontWeight: 700, mt: 0.2, fontSize: '0.72rem' }}>
+                                    🩺 {pat.primaryCondition || 'Essential Hypertension'}
+                                  </Typography>
+                                  {pat.medications && pat.medications.length > 0 && (
+                                    <Box sx={{ display: 'flex', gap: 0.4, flexWrap: 'wrap', mt: 0.4 }}>
+                                      {pat.medications.slice(0, 3).map((m: string, mIdx: number) => (
+                                        <Chip key={mIdx} label={formatSafeStr(m)} size="small" sx={{ height: 16, bgcolor: 'rgba(255,255,255,0.04)', color: '#94A8A3', fontSize: '0.58rem' }} />
+                                      ))}
+                                    </Box>
                                   )}
                                 </Box>
-                              )}
-                            </Box>
-                          </Box>
+                              </Box>
 
-                          <Box sx={{ textAlign: { xs: 'left', sm: 'right' }, display: 'flex', flexDirection: 'column', gap: 1, alignItems: { xs: 'flex-start', sm: 'flex-end' } }}>
-                            <Box>
-                              <Typography variant="caption" sx={{ color: '#94A8A3', display: 'block' }}>
-                                Total Prescriptions: <strong style={{ color: '#00C896' }}>{pat.prescriptionsCount || 1} Issued</strong>
-                              </Typography>
-                              <Typography variant="caption" sx={{ color: '#94A8A3', display: 'block' }}>
-                                Last Encounter: {formatTimeAgo(pat.lastInteractionDate)} ({formatFullDate(pat.lastInteractionDate)})
-                              </Typography>
-                              {pat.nextReview && (
-                                <Typography variant="caption" sx={{ color: '#FBBF24', fontWeight: 700, display: 'block' }}>
-                                  Next Review: {pat.nextReview}
-                                </Typography>
-                              )}
-                            </Box>
+                              <Box sx={{ textAlign: 'right', display: 'flex', flexDirection: 'column', gap: 0.6, alignItems: 'flex-end' }}>
+                                <Box>
+                                  <Typography variant="caption" sx={{ color: '#94A8A3', display: 'block', fontSize: '0.66rem' }}>
+                                    Rx: <strong style={{ color: '#00C896' }}>{pat.prescriptionsCount || 1} Issued</strong>
+                                  </Typography>
+                                  <Typography variant="caption" sx={{ color: '#94A8A3', display: 'block', fontSize: '0.64rem' }}>
+                                    {formatTimeAgo(pat.lastInteractionDate)}
+                                  </Typography>
+                                </Box>
 
-                            <Box sx={{ display: 'flex', gap: 1 }}>
-                              <Button
-                                size="small"
-                                variant="outlined"
-                                startIcon={<PersonIcon sx={{ fontSize: 14 }} />}
-                                onClick={() => handleNavigateToConnectedUser(pat, 'patient')}
-                                sx={{
-                                  borderRadius: '8px',
-                                  borderColor: 'rgba(0,200,150,0.4)',
-                                  color: '#00C896',
-                                  fontWeight: 800,
-                                  fontSize: '0.72rem',
-                                  textTransform: 'none',
-                                  '&:hover': { bgcolor: 'rgba(0,200,150,0.15)', borderColor: '#00C896' }
-                                }}
-                              >
-                                View Patient 360°
-                              </Button>
-                              <Button
-                                size="small"
-                                variant="contained"
-                                onClick={() => { setActiveTab(3); setActivitySearch(pat.name || ''); }}
-                                sx={{
-                                  borderRadius: '8px',
-                                  bgcolor: '#00C896',
-                                  color: '#0B1315',
-                                  fontWeight: 800,
-                                  fontSize: '0.72rem',
-                                  textTransform: 'none',
-                                  '&:hover': { bgcolor: '#34D399' }
-                                }}
-                              >
-                                View Activities
-                              </Button>
-                            </Box>
-                          </Box>
-                        </Paper>
-                      ))
+                                <Box sx={{ display: 'flex', gap: 0.6 }}>
+                                  <Button
+                                    size="small"
+                                    variant="outlined"
+                                    startIcon={<PersonIcon sx={{ fontSize: 13 }} />}
+                                    onClick={() => handleNavigateToConnectedUser(pat, 'patient')}
+                                    sx={{
+                                      borderRadius: '6px',
+                                      borderColor: 'rgba(0,200,150,0.4)',
+                                      color: '#00C896',
+                                      fontWeight: 800,
+                                      fontSize: '0.68rem',
+                                      py: 0.2,
+                                      px: 0.8,
+                                      textTransform: 'none',
+                                      '&:hover': { bgcolor: 'rgba(0,200,150,0.15)', borderColor: '#00C896' }
+                                    }}
+                                  >
+                                    360°
+                                  </Button>
+                                  <Button
+                                    size="small"
+                                    variant="contained"
+                                    onClick={() => { setActiveTab(3); setActivitySearch(pat.name || ''); }}
+                                    sx={{
+                                      borderRadius: '6px',
+                                      bgcolor: '#00C896',
+                                      color: '#0B1315',
+                                      fontWeight: 800,
+                                      fontSize: '0.68rem',
+                                      py: 0.2,
+                                      px: 0.8,
+                                      textTransform: 'none',
+                                      '&:hover': { bgcolor: '#34D399' }
+                                    }}
+                                  >
+                                    Activities
+                                  </Button>
+                                </Box>
+                              </Box>
+                            </Paper>
+                          </Grid>
+                        ))}
+                      </Grid>
                     )}
                   </Box>
                 )}

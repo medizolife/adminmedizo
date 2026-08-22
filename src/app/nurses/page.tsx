@@ -31,6 +31,8 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import LinkIcon from '@mui/icons-material/Link';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
+import AccessTimeIcon from '@mui/icons-material/AccessTime';
 
 import AdminLayout from '@/components/AdminLayout';
 import UserDetailModal from '@/components/UserDetailModal';
@@ -45,7 +47,30 @@ export default function NursesRoster() {
   const [search, setSearch] = useState('');
   const [selectedNurse, setSelectedNurse] = useState<any>(null);
   const [profileNurse, setProfileNurse] = useState<any>(null);
+  const [actionLoading, setActionLoading] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
+
+  const formatDate = (dateStr?: string) => {
+    if (!dateStr) return 'N/A';
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+
+  const formatTimeAgo = (dateStr?: string) => {
+    if (!dateStr) return 'Recently';
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    const diffSec = Math.floor((Date.now() - d.getTime()) / 1000);
+    if (diffSec < 60) return 'Just now';
+    if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
+    if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`;
+    const days = Math.floor(diffSec / 86400);
+    if (days === 1) return 'Yesterday';
+    if (days < 30) return `${days}d ago`;
+    if (days < 365) return `${Math.floor(days / 30)}mo ago`;
+    return `${Math.floor(days / 365)}y ago`;
+  };
 
   // Add nurse dialog
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
@@ -202,8 +227,9 @@ export default function NursesRoster() {
                     <TableCell sx={{ color: themeColors.textSecondary, fontWeight: 800 }}>Nurse Name &amp; Contact</TableCell>
                     <TableCell sx={{ color: themeColors.textSecondary, fontWeight: 800 }}>Specialization &amp; Qualification</TableCell>
                     <TableCell sx={{ color: themeColors.textSecondary, fontWeight: 800 }}>RN License</TableCell>
-                    <TableCell sx={{ color: themeColors.textSecondary, fontWeight: 800 }}>Affiliated Doctors</TableCell>
-                    <TableCell sx={{ color: themeColors.textSecondary, fontWeight: 800 }}>Active Care Cases</TableCell>
+                    <TableCell sx={{ color: themeColors.textSecondary, fontWeight: 800 }}>Affiliations &amp; Cases</TableCell>
+                    <TableCell sx={{ color: themeColors.textSecondary, fontWeight: 800 }}>Account Created</TableCell>
+                    <TableCell sx={{ color: themeColors.textSecondary, fontWeight: 800 }}>Last Login / Active</TableCell>
                     <TableCell sx={{ color: themeColors.textSecondary, fontWeight: 800 }}>Status</TableCell>
                     <TableCell sx={{ color: themeColors.textSecondary, fontWeight: 800, textAlign: 'right' }}>Actions</TableCell>
                   </TableRow>
@@ -211,12 +237,15 @@ export default function NursesRoster() {
                 <TableBody>
                   {filteredNurses.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={7} sx={{ textAlign: 'center', py: 5, color: themeColors.textSecondary }}>
+                      <TableCell colSpan={8} sx={{ textAlign: 'center', py: 5, color: themeColors.textSecondary }}>
                         No nurse accounts found.
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filteredNurses.map((nurse) => (
+                    filteredNurses.map((nurse) => {
+                      const createdDate = nurse.createdAt;
+                      const lastActiveDate = nurse.lastLogin || nurse.updatedAt || nurse.createdAt;
+                      return (
                       <TableRow key={nurse.id} sx={{ '& td': { borderColor: themeColors.border, color: themeColors.textPrimary } }}>
                         <TableCell>
                           <Box
@@ -248,18 +277,40 @@ export default function NursesRoster() {
                           {nurse.nurseLicenseNumber || 'RN-PENDING'}
                         </TableCell>
                         <TableCell>
-                          <Chip
-                            label={`${(nurse.affiliations || []).length} Affiliated Doctors`}
-                            size="small"
-                            sx={{ bgcolor: isLight ? 'rgba(124, 58, 237, 0.1)' : 'rgba(0,200,150,0.1)', color: themeColors.accentTertiary, fontWeight: 700 }}
-                          />
+                          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                            <Chip
+                              label={`${(nurse.affiliations || []).length} Affiliated Doctors`}
+                              size="small"
+                              sx={{ bgcolor: isLight ? 'rgba(124, 58, 237, 0.1)' : 'rgba(0,200,150,0.1)', color: themeColors.accentTertiary, fontWeight: 700, width: 'fit-content' }}
+                            />
+                            <Chip
+                              label={`${nurse.activeAssignmentsCount || 0} Active Patients`}
+                              size="small"
+                              sx={{ bgcolor: (nurse.activeAssignmentsCount || 0) > 0 ? 'rgba(76, 175, 80, 0.15)' : (isLight ? '#EBE5D8' : 'rgba(255,255,255,0.05)'), color: (nurse.activeAssignmentsCount || 0) > 0 ? '#4CAF50' : themeColors.textSecondary, fontWeight: 700, width: 'fit-content' }}
+                            />
+                          </Box>
                         </TableCell>
                         <TableCell>
-                          <Chip
-                            label={`${nurse.activeAssignmentsCount || 0} Active Patients`}
-                            size="small"
-                            sx={{ bgcolor: (nurse.activeAssignmentsCount || 0) > 0 ? 'rgba(76, 175, 80, 0.15)' : (isLight ? '#EBE5D8' : 'rgba(255,255,255,0.05)'), color: (nurse.activeAssignmentsCount || 0) > 0 ? '#4CAF50' : themeColors.textSecondary, fontWeight: 700 }}
-                          />
+                          <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                            <Typography variant="body2" sx={{ fontWeight: 700, color: themeColors.textPrimary, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              <CalendarMonthIcon sx={{ fontSize: 13, color: '#00C896' }} />
+                              {createdDate ? formatDate(createdDate) : 'July 2026'}
+                            </Typography>
+                            <Typography variant="caption" sx={{ color: themeColors.textSecondary, fontWeight: 600, fontSize: '0.7rem' }}>
+                              {formatTimeAgo(createdDate)}
+                            </Typography>
+                          </Box>
+                        </TableCell>
+                        <TableCell>
+                          <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                            <Typography variant="body2" sx={{ fontWeight: 700, color: themeColors.accentTertiary, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              <AccessTimeIcon sx={{ fontSize: 13, color: themeColors.accentTertiary }} />
+                              {lastActiveDate ? formatDate(lastActiveDate) : 'Active Today'}
+                            </Typography>
+                            <Typography variant="caption" sx={{ color: isLight ? '#7C3AED' : '#C084FC', fontWeight: 700, fontSize: '0.7rem' }}>
+                              {formatTimeAgo(lastActiveDate)}
+                            </Typography>
+                          </Box>
                         </TableCell>
                         <TableCell>
                           <Chip
@@ -305,8 +356,9 @@ export default function NursesRoster() {
                           </Button>
                         </TableCell>
                       </TableRow>
-                    ))
-                  )}
+                    );
+                  })
+                )}
                 </TableBody>
               </Table>
             </TableContainer>

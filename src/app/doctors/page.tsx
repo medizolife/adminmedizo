@@ -31,6 +31,8 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import DeleteIcon from '@mui/icons-material/Delete';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
+import AccessTimeIcon from '@mui/icons-material/AccessTime';
 
 import AdminLayout from '@/components/AdminLayout';
 import UserDetailModal from '@/components/UserDetailModal';
@@ -43,8 +45,30 @@ export default function DoctorsRoster() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedDoctor, setSelectedDoctor] = useState<any>(null);
-  const [actionLoading, setActionLoading] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
+  const [actionLoading, setActionLoading] = useState(false);
+
+  const formatDate = (dateStr?: string) => {
+    if (!dateStr) return 'N/A';
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+
+  const formatTimeAgo = (dateStr?: string) => {
+    if (!dateStr) return 'Recently';
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    const diffSec = Math.floor((Date.now() - d.getTime()) / 1000);
+    if (diffSec < 60) return 'Just now';
+    if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
+    if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`;
+    const days = Math.floor(diffSec / 86400);
+    if (days === 1) return 'Yesterday';
+    if (days < 30) return `${days}d ago`;
+    if (days < 365) return `${Math.floor(days / 30)}mo ago`;
+    return `${Math.floor(days / 365)}y ago`;
+  };
 
   // Instant in-memory search and status filtering (0ms)
   const filteredDoctors = doctors.filter((doc) => {
@@ -66,10 +90,6 @@ export default function DoctorsRoster() {
     return true;
   });
 
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearch(e.target.value);
-  };
-
   const handleToggleStatus = async (doctor: any) => {
     const docId = doctor.id || doctor._id || doctor.email;
     const newStatus = doctor.status === 'deactivated' ? 'active' : 'deactivated';
@@ -77,7 +97,7 @@ export default function DoctorsRoster() {
     try {
       const success = await toggleUserStatusLocal(docId, newStatus);
       if (success) {
-        setToastMessage(`Account for Dr. ${doctor.firstName} ${doctor.lastName} is now ${newStatus.toUpperCase()}`);
+        setToastMessage(`Dr. ${doctor.firstName} ${doctor.lastName} account is now ${newStatus.toUpperCase()}`);
       }
     } catch (err) {
       console.error('Error toggling status:', err);
@@ -92,18 +112,21 @@ export default function DoctorsRoster() {
       alert('Cannot delete: Missing doctor identifier');
       return;
     }
-    const confirmName = `Dr. ${doctor.firstName || ''} ${doctor.lastName || ''}`.trim();
-    if (!window.confirm(`⚠️ PERMANENT DELETE WARNING!\n\nAre you sure you want to permanently delete doctor account "${confirmName}" (${doctor.email})?\n\nThis action cannot be undone.`)) {
+    const confirmName = `Dr. ${doctor.firstName || ''} ${doctor.lastName || ''}`.trim() || doctor.email;
+    if (!window.confirm(`⚠️ PERMANENT DELETE WARNING!\n\nAre you sure you want to permanently delete doctor "${confirmName}" (${doctor.email})?\n\nThis action cannot be undone.`)) {
       return;
     }
+    setActionLoading(true);
     try {
       const success = await deleteUserLocal(targetId);
       if (success) {
-        setToastMessage(`✅ Doctor account "${confirmName}" permanently deleted successfully!`);
+        setToastMessage(`✅ Doctor "${confirmName}" permanently deleted successfully!`);
       }
     } catch (err: any) {
       console.error('Error deleting doctor:', err);
       alert(err.response?.data?.message || 'Failed to delete doctor user.');
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -112,10 +135,10 @@ export default function DoctorsRoster() {
       <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
         <Box>
           <Typography variant="h4" sx={{ fontWeight: 900, color: themeColors.textPrimary, display: 'flex', alignItems: 'center', gap: 1.5 }}>
-            <MedicalServicesIcon sx={{ color: themeColors.accentPrimary, fontSize: 32 }} /> Doctors Roster & Verification
+            <MedicalServicesIcon sx={{ color: themeColors.accentPrimary, fontSize: 32 }} /> Doctors Roster
           </Typography>
           <Typography variant="body2" sx={{ color: themeColors.textSecondary, mt: 0.5 }}>
-            View details, DigiLocker identity status, and manage doctor activation/deactivation
+            Manage verified practitioners, account registration dates, last active timestamps, and DigiLocker credentials
           </Typography>
         </Box>
         <Button
@@ -139,9 +162,9 @@ export default function DoctorsRoster() {
         <Box sx={{ flex: 1, minWidth: 280 }}>
           <TextField
             fullWidth
-            placeholder="Search doctors by name, email, or specialization..."
+            placeholder="Search doctors by name, specialization, or license..."
             value={search}
-            onChange={handleSearchChange}
+            onChange={(e) => setSearch(e.target.value)}
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
@@ -205,6 +228,8 @@ export default function DoctorsRoster() {
                 <TableCell>Specialization & License</TableCell>
                 <TableCell>DigiLocker Status</TableCell>
                 <TableCell>Prescriptions Rx</TableCell>
+                <TableCell>Account Created</TableCell>
+                <TableCell>Last Login / Active</TableCell>
                 <TableCell>Account Status</TableCell>
                 <TableCell align="right">Actions</TableCell>
               </TableRow>
@@ -212,19 +237,21 @@ export default function DoctorsRoster() {
             <TableBody>
               {!isPreloaded && doctors.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} align="center" sx={{ py: 6 }}>
+                  <TableCell colSpan={8} align="center" sx={{ py: 6 }}>
                     <CircularProgress color="primary" />
                   </TableCell>
                 </TableRow>
               ) : filteredDoctors.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} align="center" sx={{ py: 6, color: themeColors.textSecondary }}>
+                  <TableCell colSpan={8} align="center" sx={{ py: 6, color: themeColors.textSecondary }}>
                     No doctors found matching criteria.
                   </TableCell>
                 </TableRow>
               ) : (
                 filteredDoctors.map((doc) => {
                   const isDeactivated = doc.status === 'deactivated';
+                  const createdDate = doc.createdAt;
+                  const lastActiveDate = doc.lastLogin || doc.updatedAt || doc.createdAt;
                   return (
                     <TableRow key={doc.id || doc._id} sx={{ '& td': { borderColor: themeColors.border, color: themeColors.textPrimary } }}>
                       <TableCell>
@@ -278,6 +305,28 @@ export default function DoctorsRoster() {
                       </TableCell>
                       <TableCell sx={{ fontWeight: 800, color: isLight ? '#008F68' : '#33D3AA' }}>
                         {doc.prescriptionCount || 0} Created
+                      </TableCell>
+                      <TableCell>
+                        <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                          <Typography variant="body2" sx={{ fontWeight: 700, color: themeColors.textPrimary, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            <CalendarMonthIcon sx={{ fontSize: 13, color: '#00C896' }} />
+                            {createdDate ? formatDate(createdDate) : 'July 2026'}
+                          </Typography>
+                          <Typography variant="caption" sx={{ color: themeColors.textSecondary, fontWeight: 600, fontSize: '0.7rem' }}>
+                            {formatTimeAgo(createdDate)}
+                          </Typography>
+                        </Box>
+                      </TableCell>
+                      <TableCell>
+                        <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                          <Typography variant="body2" sx={{ fontWeight: 700, color: isLight ? '#008F68' : '#34D399', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            <AccessTimeIcon sx={{ fontSize: 13, color: '#00C896' }} />
+                            {lastActiveDate ? formatDate(lastActiveDate) : 'Active Today'}
+                          </Typography>
+                          <Typography variant="caption" sx={{ color: isLight ? '#059669' : '#34D399', fontWeight: 700, fontSize: '0.7rem' }}>
+                            {formatTimeAgo(lastActiveDate)}
+                          </Typography>
+                        </Box>
                       </TableCell>
                       <TableCell>
                         <Chip

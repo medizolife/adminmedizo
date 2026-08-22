@@ -24,6 +24,8 @@ import BlockIcon from '@mui/icons-material/Block';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import DeleteIcon from '@mui/icons-material/Delete';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
+import AccessTimeIcon from '@mui/icons-material/AccessTime';
 
 import AdminLayout from '@/components/AdminLayout';
 import UserDetailModal from '@/components/UserDetailModal';
@@ -37,6 +39,28 @@ export default function PatientsRoster() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedPatient, setSelectedPatient] = useState<any>(null);
   const [toastMessage, setToastMessage] = useState('');
+
+  const formatDate = (dateStr?: string) => {
+    if (!dateStr) return 'N/A';
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+
+  const formatTimeAgo = (dateStr?: string) => {
+    if (!dateStr) return 'Recently';
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return 'Recently';
+    const diffSec = Math.floor((Date.now() - d.getTime()) / 1000);
+    if (diffSec < 60) return 'Just now';
+    if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
+    if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`;
+    const days = Math.floor(diffSec / 86400);
+    if (days === 1) return 'Yesterday';
+    if (days < 30) return `${days}d ago`;
+    if (days < 365) return `${Math.floor(days / 30)}mo ago`;
+    return `${Math.floor(days / 365)}y ago`;
+  };
 
   // Instant in-memory search and status filtering (0ms)
   const filteredPatients = patients.filter((pat) => {
@@ -99,7 +123,7 @@ export default function PatientsRoster() {
             <PeopleIcon sx={{ color: themeColors.accentSecondary, fontSize: 32 }} /> Patients Roster &amp; Records
           </Typography>
           <Typography variant="body2" sx={{ color: themeColors.textSecondary, mt: 0.5 }}>
-            Monitor registered patients, prescription histories, and manage account activation status
+            Monitor registered patients, account creation dates, last active timestamps, and prescription records
           </Typography>
         </Box>
         <Button
@@ -189,6 +213,8 @@ export default function PatientsRoster() {
                 <TableCell>Phone &amp; Bio</TableCell>
                 <TableCell>Blood Group</TableCell>
                 <TableCell>Prescriptions Issued</TableCell>
+                <TableCell>Account Created</TableCell>
+                <TableCell>Last Login / Active</TableCell>
                 <TableCell>Account Status</TableCell>
                 <TableCell align="right">Actions</TableCell>
               </TableRow>
@@ -196,19 +222,21 @@ export default function PatientsRoster() {
             <TableBody>
               {!isPreloaded && patients.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} align="center" sx={{ py: 6 }}>
+                  <TableCell colSpan={8} align="center" sx={{ py: 6 }}>
                     <CircularProgress color="primary" />
                   </TableCell>
                 </TableRow>
               ) : filteredPatients.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} align="center" sx={{ py: 6, color: themeColors.textSecondary }}>
+                  <TableCell colSpan={8} align="center" sx={{ py: 6, color: themeColors.textSecondary }}>
                     No patients found matching criteria.
                   </TableCell>
                 </TableRow>
               ) : (
                 filteredPatients.map((pat) => {
                   const isDeactivated = pat.status === 'deactivated';
+                  const createdDate = pat.createdAt;
+                  const lastActiveDate = pat.lastLogin || pat.updatedAt || pat.createdAt;
                   return (
                     <TableRow key={pat.id || pat._id} sx={{ '& td': { borderColor: themeColors.border, color: themeColors.textPrimary } }}>
                       <TableCell>
@@ -246,6 +274,28 @@ export default function PatientsRoster() {
                       </TableCell>
                       <TableCell sx={{ fontWeight: 800, color: isLight ? '#0284C7' : '#60A5FA' }}>
                         {pat.prescriptionCount || 0} Records
+                      </TableCell>
+                      <TableCell>
+                        <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                          <Typography variant="body2" sx={{ fontWeight: 700, color: themeColors.textPrimary, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            <CalendarMonthIcon sx={{ fontSize: 13, color: '#00C896' }} />
+                            {createdDate ? formatDate(createdDate) : 'July 2026'}
+                          </Typography>
+                          <Typography variant="caption" sx={{ color: themeColors.textSecondary, fontWeight: 600, fontSize: '0.7rem' }}>
+                            {formatTimeAgo(createdDate)}
+                          </Typography>
+                        </Box>
+                      </TableCell>
+                      <TableCell>
+                        <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                          <Typography variant="body2" sx={{ fontWeight: 700, color: isLight ? '#0284C7' : '#38BDF8', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            <AccessTimeIcon sx={{ fontSize: 13, color: '#38BDF8' }} />
+                            {lastActiveDate ? formatDate(lastActiveDate) : 'Active Today'}
+                          </Typography>
+                          <Typography variant="caption" sx={{ color: isLight ? '#059669' : '#34D399', fontWeight: 700, fontSize: '0.7rem' }}>
+                            {formatTimeAgo(lastActiveDate)}
+                          </Typography>
+                        </Box>
                       </TableCell>
                       <TableCell>
                         <Chip
