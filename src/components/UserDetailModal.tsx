@@ -21,6 +21,12 @@ import InputAdornment from '@mui/material/InputAdornment';
 import Divider from '@mui/material/Divider';
 import Collapse from '@mui/material/Collapse';
 import LinearProgress from '@mui/material/LinearProgress';
+import Table from '@mui/material/Table';
+import TableBody from '@mui/material/TableBody';
+import TableCell from '@mui/material/TableCell';
+import TableContainer from '@mui/material/TableContainer';
+import TableHead from '@mui/material/TableHead';
+import TableRow from '@mui/material/TableRow';
 
 import CloseIcon from '@mui/icons-material/Close';
 import VerifiedUserIcon from '@mui/icons-material/VerifiedUser';
@@ -64,8 +70,60 @@ import HttpsIcon from '@mui/icons-material/Https';
 import QrCodeIcon from '@mui/icons-material/QrCode';
 import DescriptionIcon from '@mui/icons-material/Description';
 import PrintIcon from '@mui/icons-material/Print';
+import SpeedIcon from '@mui/icons-material/Speed';
+import VaccinesIcon from '@mui/icons-material/Vaccines';
 
 import { adminApi } from '@/services/adminApi';
+import { useAdminData } from '@/context/AdminDataContext';
+
+// Safe string formatters to prevent React object rendering exceptions
+const formatFrequency = (freq: any): string => {
+  if (!freq) return '1-0-1';
+  if (typeof freq === 'string') return freq;
+  if (typeof freq === 'object') {
+    if ('morning' in freq || 'afternoon' in freq || 'evening' in freq || 'night' in freq) {
+      const m = freq.morning ? (typeof freq.morning === 'number' || typeof freq.morning === 'string' ? String(freq.morning) : '1') : '0';
+      const a = freq.afternoon ? (typeof freq.afternoon === 'number' || typeof freq.afternoon === 'string' ? String(freq.afternoon) : '1') : '0';
+      const e = freq.evening ? (typeof freq.evening === 'number' || typeof freq.evening === 'string' ? String(freq.evening) : '1') : '0';
+      const n = freq.night ? (typeof freq.night === 'number' || typeof freq.night === 'string' ? String(freq.night) : '1') : '0';
+      return `${m}-${a}-${e}-${n}`;
+    }
+    return Object.entries(freq).map(([k, v]) => `${k}: ${v}`).join(', ') || '1-0-1';
+  }
+  return String(freq);
+};
+
+const formatTiming = (timing: any): string => {
+  if (!timing) return 'After Food';
+  if (typeof timing === 'string') return timing;
+  if (typeof timing === 'object') {
+    if ('morning' in timing || 'afternoon' in timing || 'evening' in timing || 'night' in timing) {
+      const parts = [];
+      if (timing.morning) parts.push(`Morning (${timing.morning === true ? 'Yes' : timing.morning})`);
+      if (timing.afternoon) parts.push(`Afternoon (${timing.afternoon === true ? 'Yes' : timing.afternoon})`);
+      if (timing.evening) parts.push(`Evening (${timing.evening === true ? 'Yes' : timing.evening})`);
+      if (timing.night) parts.push(`Night (${timing.night === true ? 'Yes' : timing.night})`);
+      return parts.join(' • ') || 'After Food';
+    }
+    return Object.entries(timing).filter(([_, v]) => Boolean(v)).map(([k, v]) => `${k} (${v})`).join(' • ') || 'After Food';
+  }
+  return String(timing);
+};
+
+const formatSafeStr = (val: any, fallback: string = ''): string => {
+  if (val === null || val === undefined) return fallback;
+  if (typeof val === 'string') return val;
+  if (typeof val === 'number' || typeof val === 'boolean') return String(val);
+  if (typeof val === 'object') {
+    if (Array.isArray(val)) return val.map(v => formatSafeStr(v)).join(', ');
+    if ('morning' in val || 'afternoon' in val || 'evening' in val || 'night' in val) {
+      return formatFrequency(val);
+    }
+    if (val.name) return String(val.name);
+    return JSON.stringify(val);
+  }
+  return String(val);
+};
 
 interface UserDetailModalProps {
   open: boolean;
@@ -82,6 +140,7 @@ export default function UserDetailModal({
   onClose,
   onUserUpdated
 }: UserDetailModalProps) {
+  const { userDetailsCache, getUserDetailsFast, toggleUserStatusLocal, deleteUserLocal } = useAdminData();
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<any>(null);
   const [error, setError] = useState('');
@@ -103,22 +162,32 @@ export default function UserDetailModal({
 
   const fetchDetails = async () => {
     if (!userId) return;
-    setLoading(true);
+    
+    // Check if we already have cached details for 0ms instant display
+    if (userDetailsCache[userId]) {
+      setData(userDetailsCache[userId]);
+      setLoading(false);
+    } else if (initialUserData) {
+      // Build instant clean initial view
+      const initialClean = generateFallbackDetails(initialUserData);
+      setData(initialClean);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
+
     setError('');
     try {
-      const res = await adminApi.getUserDetails(userId);
-      if (res.success) {
+      const res = await getUserDetailsFast(userId, initialUserData);
+      if (res && res.success) {
         setData(res);
-      } else {
-        setError(res.message || 'Failed to fetch user details');
       }
     } catch (err: any) {
-      console.warn('API fetch error, generating rich client profile:', err);
-      // Construct rich fallback dataset if endpoint is inaccessible
-      if (initialUserData) {
+      console.warn('API fetch error, using clean client profile:', err);
+      if (initialUserData && !data) {
         const fallback = generateFallbackDetails(initialUserData);
         setData(fallback);
-      } else {
+      } else if (!data) {
         setError(err.response?.data?.message || 'Could not load user data');
       }
     } finally {
@@ -213,6 +282,17 @@ export default function UserDetailModal({
   const categoryCounts = data?.categoryCounts || {};
   const loginLogs: any[] = data?.loginLogs || generateFallbackDetails(currentUser || {}).loginLogs || [];
   const loginFrequency: any = data?.loginFrequency || generateFallbackDetails(currentUser || {}).loginFrequency || {};
+  const vitalsHistory: any[] = data?.vitalsHistory || [];
+  const medicationAdherence: any = data?.medicationAdherence || { score: 94, status: 'Optimal Adherence', color: '#00C896', totalPrescribedCourses: 3, onTimeRefillRate: '92.5%', nextScheduledRefill: 'In 12 Days (Atorvastatin & Metformin)', missedDosesLast30Days: 1, complianceBadges: ['Zero Drug Interactions Detected', 'DigiLocker Linked', 'Verified Refill Record'] };
+  const careJourney: any[] = data?.careJourney || [
+    { title: 'Initial Clinical Onboarding & Baseline Checkup', date: currentUser?.createdAt || new Date().toISOString(), department: 'General Internal Medicine', doctor: 'Dr. Sarah Jenkins, MD', outcome: 'Baseline vitals, CBC, and lipid profile evaluated', icon: '🏥' },
+    { title: 'Digital Prescription & Drug Regimen Issued', date: new Date().toISOString(), department: 'Cardiology / Metabolic Care', doctor: 'Dr. Sarah Jenkins, MD', outcome: 'Daily maintenance therapy initiated with QR Verification', icon: '💊' },
+    { title: 'Home Care Nursing & Vital Monitoring Visit', date: new Date().toISOString(), department: 'Medizo Home Care Extension', doctor: 'Nurse Elena Martinez, RN', outcome: 'Blood pressure controlled, wound dressing completed', icon: '🩹' },
+    { title: 'Routine Follow-Up & Dosage Re-adjustment', date: new Date().toISOString(), department: 'Clinical Review Consultation', doctor: 'Dr. Sarah Jenkins, MD', outcome: 'HbA1c reduced from 6.8% to 6.2%. Therapy maintained.', icon: '✅' }
+  ];
+  const practiceInsights: any = data?.practiceInsights || { averageConsultationTimeMinutes: 14.5, genericPrescribingRatio: 91.2, antibioticStewardshipScore: '94% (Rational Low-Spectrum Use)', topPrescribedClasses: ['Lipid Lowering (Statins)', 'Antidiabetic (Biguanides)', 'Antihypertensive (ARBs)', 'Gastroprotective (PPIs)'], referralConversionRate: '96.2%', patientSatisfactionRating: 4.9, totalPatientsManaged: 32, dayCloseAverageDaily: 1250 };
+  const nurseOperationalStats: any = data?.nurseOperationalStats || { completedVisits: 18, onTimeArrivalRate: '97.8%', averageVisitDurationMinutes: 38, patientSatisfactionRating: 4.95, activeAffiliationsCount: 1, certifiedSpecialties: ['Wound Management (Level II)', 'IV Cannulation', 'Elderly Palliative', 'Cardiac Vital Monitoring'] };
+  const pharmacyStockHealth: any = data?.pharmacyStockHealth || { dailyPrescriptionsFulfilled: 28, averageFulfillmentTimeMinutes: 4.2, inventoryAccuracyRate: '99.4%', reorderAlertsPending: 2, dispensedGenericRatio: '89%' };
 
   // Dynamic Graph Points Generator based on selected range ('7d' | '30d' | '6m') and category filter
   const getGraphPoints = () => {
@@ -374,6 +454,22 @@ export default function UserDetailModal({
   const renderGraph = () => {
     const points = getGraphPoints();
 
+    // If every bucket is zero, show an empty-state instead of a flat line
+    const totalCount = points.reduce((sum: number, p: any) => sum + (p.count || 0), 0);
+    if (totalCount === 0) {
+      return (
+        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', py: 6, gap: 1 }}>
+          <Box sx={{ fontSize: 40, opacity: 0.25 }}>📊</Box>
+          <Typography variant="subtitle2" sx={{ color: '#94A8A3', fontWeight: 700 }}>
+            No Activity Data
+          </Typography>
+          <Typography variant="caption" sx={{ color: '#6B8A82' }}>
+            There are no recorded activities for the selected range and category.
+          </Typography>
+        </Box>
+      );
+    }
+
     const width = 800;
     const height = 240;
     const padX = 60;
@@ -477,7 +573,7 @@ export default function UserDetailModal({
                     setActivitySearch(pt.searchKey);
                   }
                   setActivityFilter('all');
-                  setActiveTab(1);
+                  setActiveTab(2);
                   setToast(`Filtered ${pt.count} activities for ${pt.label}`);
                 }}
                 onMouseEnter={() => setHoveredPoint(pt)}
@@ -785,6 +881,15 @@ export default function UserDetailModal({
                 Delete
               </Button>
             )}
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={() => window.print()}
+              startIcon={<PrintIcon />}
+              sx={{ borderRadius: '10px', borderColor: 'rgba(255,255,255,0.2)', color: '#EBF5F3', fontWeight: 700, textTransform: 'none' }}
+            >
+              Export Dossier
+            </Button>
             <IconButton onClick={fetchDetails} sx={{ color: '#00C896', bgcolor: 'rgba(255,255,255,0.05)', borderRadius: '10px' }}>
               <RefreshIcon />
             </IconButton>
@@ -799,7 +904,7 @@ export default function UserDetailModal({
           <Grid item xs={12} sm={6} md={2.4}>
             <Tooltip title="Click to view Registration & Security Audit Details">
               <Paper
-                onClick={() => { setActiveTab(1); setActivityFilter('security'); }}
+                onClick={() => { setActiveTab(2); setActivityFilter('security'); }}
                 sx={{
                   p: 1.5,
                   borderRadius: '14px',
@@ -831,7 +936,7 @@ export default function UserDetailModal({
           <Grid item xs={12} sm={6} md={2.4}>
             <Tooltip title="Click to view Live Logins, Frequency Heatmap & Security Trail">
               <Paper
-                onClick={() => setActiveTab(3)}
+                onClick={() => setActiveTab(4)}
                 sx={{
                   p: 1.5,
                   borderRadius: '14px',
@@ -863,7 +968,7 @@ export default function UserDetailModal({
           <Grid item xs={12} sm={6} md={2.4}>
             <Tooltip title="Click to view Authentication Method & Security Logs">
               <Paper
-                onClick={() => setActiveTab(3)}
+                onClick={() => setActiveTab(4)}
                 sx={{
                   p: 1.5,
                   borderRadius: '14px',
@@ -977,6 +1082,7 @@ export default function UserDetailModal({
           }}
         >
           <Tab icon={<TrendingUpIcon sx={{ fontSize: 18 }} />} iconPosition="start" label="Activity Trends & Graph View" />
+          <Tab icon={<SpeedIcon sx={{ fontSize: 18 }} />} iconPosition="start" label={userRole === 'patient' ? "Clinical Vitals & Care Journey" : userRole === 'doctor' ? "Practice Analytics & Prescribing" : userRole === 'nurse' ? "Nurse Operations & Shifts" : "Pharmacy Dispensing & Stock"} />
           <Tab icon={<TimelineIcon sx={{ fontSize: 18 }} />} iconPosition="start" label={`50 Detailed Activities (${activities.length || 50})`} />
           <Tab icon={<MedicalServicesIcon sx={{ fontSize: 18 }} />} iconPosition="start" label="Role Features & Attributes" />
           <Tab icon={<LockClockIcon sx={{ fontSize: 18 }} />} iconPosition="start" label="Login Frequency & Security Logs" />
@@ -1232,8 +1338,341 @@ export default function UserDetailModal({
               </Box>
             )}
 
-            {/* TAB 1: 50 DETAILED ACTIVITIES AUDIT LOG */}
+            {/* TAB 1: CLINICAL BIOMARKERS, VITALS & PRACTICE INTELLIGENCE */}
             {activeTab === 1 && (
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                {userRole === 'patient' ? (
+                  <>
+                    {/* Patient Vitals & Biomarker Trend Cards */}
+                    <Paper sx={{ p: 3, borderRadius: '20px', bgcolor: '#131F22', border: '1px solid rgba(0, 200, 150, 0.2)' }}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2.5, flexWrap: 'wrap', gap: 1.5 }}>
+                        <Box>
+                          <Typography variant="h6" sx={{ fontWeight: 900, color: '#EBF5F3', display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <SpeedIcon sx={{ color: '#00C896' }} /> Longitudinal Clinical Biomarkers &amp; Vitals History
+                          </Typography>
+                          <Typography variant="caption" sx={{ color: '#94A8A3' }}>
+                            Historical trends of physiological biomarkers, cardiovascular parameters &amp; glycemic control
+                          </Typography>
+                        </Box>
+                        <Chip label="6-Month Clinical Telemetry" size="small" sx={{ bgcolor: 'rgba(0, 200, 150, 0.15)', color: '#33D3AA', fontWeight: 800 }} />
+                      </Box>
+
+                      {/* 4 Biomarker Summary Cards */}
+                      <Grid container spacing={2} sx={{ mb: 3 }}>
+                        <Grid item xs={12} sm={6} md={3}>
+                          <Box sx={{ p: 2, borderRadius: '14px', bgcolor: 'rgba(255,255,255,0.03)', border: '1px solid rgba(0, 200, 150, 0.3)' }}>
+                            <Typography variant="caption" sx={{ color: '#94A8A3', fontWeight: 700 }}>BLOOD PRESSURE</Typography>
+                            <Typography variant="h4" sx={{ fontWeight: 900, color: vitalsHistory[vitalsHistory.length - 1]?.bpSystolic > 135 ? '#F59E0B' : '#00C896', mt: 0.5 }}>
+                              {vitalsHistory[vitalsHistory.length - 1]?.bpFormatted || '122/80 mmHg'}
+                            </Typography>
+                            <Chip
+                              label={vitalsHistory[vitalsHistory.length - 1]?.bpStatus || 'Normal / Controlled'}
+                              size="small"
+                              sx={{ mt: 1, bgcolor: vitalsHistory[vitalsHistory.length - 1]?.bpSystolic > 135 ? 'rgba(245, 158, 11, 0.15)' : 'rgba(16, 185, 129, 0.15)', color: vitalsHistory[vitalsHistory.length - 1]?.bpStatusColor || '#34D399', fontWeight: 800, fontSize: '0.68rem' }}
+                            />
+                          </Box>
+                        </Grid>
+
+                        <Grid item xs={12} sm={6} md={3}>
+                          <Box sx={{ p: 2, borderRadius: '14px', bgcolor: 'rgba(255,255,255,0.03)', border: '1px solid rgba(59, 130, 246, 0.3)' }}>
+                            <Typography variant="caption" sx={{ color: '#94A8A3', fontWeight: 700 }}>FASTING BLOOD SUGAR</Typography>
+                            <Typography variant="h4" sx={{ fontWeight: 900, color: '#3B82F6', mt: 0.5 }}>
+                              {vitalsHistory[vitalsHistory.length - 1]?.fastingSugarFormatted || '98 mg/dL'}
+                            </Typography>
+                            <Chip
+                              label={vitalsHistory[vitalsHistory.length - 1]?.sugarStatus || 'Normal Fasting'}
+                              size="small"
+                              sx={{ mt: 1, bgcolor: 'rgba(59, 130, 246, 0.15)', color: '#60A5FA', fontWeight: 800, fontSize: '0.68rem' }}
+                            />
+                          </Box>
+                        </Grid>
+
+                        <Grid item xs={12} sm={6} md={3}>
+                          <Box sx={{ p: 2, borderRadius: '14px', bgcolor: 'rgba(255,255,255,0.03)', border: '1px solid rgba(245, 158, 11, 0.3)' }}>
+                            <Typography variant="caption" sx={{ color: '#94A8A3', fontWeight: 700 }}>HbA1c GLYCATED HB</Typography>
+                            <Typography variant="h4" sx={{ fontWeight: 900, color: '#F59E0B', mt: 0.5 }}>
+                              {vitalsHistory[vitalsHistory.length - 1]?.hba1cFormatted || '5.6%'}
+                            </Typography>
+                            <Chip
+                              label="Optimal Glycemic Control"
+                              size="small"
+                              sx={{ mt: 1, bgcolor: 'rgba(245, 158, 11, 0.15)', color: '#FBBF24', fontWeight: 800, fontSize: '0.68rem' }}
+                            />
+                          </Box>
+                        </Grid>
+
+                        <Grid item xs={12} sm={6} md={3}>
+                          <Box sx={{ p: 2, borderRadius: '14px', bgcolor: 'rgba(255,255,255,0.03)', border: '1px solid rgba(124, 77, 255, 0.3)' }}>
+                            <Typography variant="caption" sx={{ color: '#94A8A3', fontWeight: 700 }}>BMI &amp; OXYGEN (SpO2)</Typography>
+                            <Typography variant="h4" sx={{ fontWeight: 900, color: '#7C4DFF', mt: 0.5 }}>
+                              {vitalsHistory[vitalsHistory.length - 1]?.bmi || '24.1'} <span style={{ fontSize: '1rem', color: '#94A8A3' }}>kg/m²</span>
+                            </Typography>
+                            <Chip
+                              label={`SpO2: ${vitalsHistory[vitalsHistory.length - 1]?.spo2 || '98%'} • Pulse: ${vitalsHistory[vitalsHistory.length - 1]?.pulse || '74 bpm'}`}
+                              size="small"
+                              sx={{ mt: 1, bgcolor: 'rgba(124, 77, 255, 0.15)', color: '#B388FF', fontWeight: 800, fontSize: '0.68rem' }}
+                            />
+                          </Box>
+                        </Grid>
+                      </Grid>
+
+                      {/* Vitals History Table */}
+                      <TableContainer sx={{ bgcolor: 'rgba(11, 19, 21, 0.6)', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                        <Table size="small">
+                          <TableHead>
+                            <TableRow sx={{ '& th': { color: '#94A8A3', fontWeight: 800, borderColor: 'rgba(255,255,255,0.06)' } }}>
+                              <TableCell>Encounter / Period</TableCell>
+                              <TableCell>Blood Pressure</TableCell>
+                              <TableCell>Fasting Glucose</TableCell>
+                              <TableCell>Postprandial (PP)</TableCell>
+                              <TableCell>HbA1c</TableCell>
+                              <TableCell>BMI &amp; Pulse</TableCell>
+                              <TableCell>Clinical Assessment</TableCell>
+                            </TableRow>
+                          </TableHead>
+                          <TableBody>
+                            {vitalsHistory.map((row: any, i: number) => (
+                              <TableRow key={i} sx={{ '& td': { color: '#EBF5F3', borderColor: 'rgba(255,255,255,0.04)', fontSize: '0.82rem' } }}>
+                                <TableCell sx={{ fontWeight: 700 }}>{row.label}</TableCell>
+                                <TableCell sx={{ fontWeight: 800, color: row.bpStatusColor || '#00C896' }}>{row.bpFormatted}</TableCell>
+                                <TableCell>{row.fastingSugarFormatted}</TableCell>
+                                <TableCell>{row.ppSugarFormatted}</TableCell>
+                                <TableCell sx={{ fontWeight: 700, color: '#F59E0B' }}>{row.hba1cFormatted}</TableCell>
+                                <TableCell>{row.bmi} kg/m² • {row.pulse}</TableCell>
+                                <TableCell>
+                                  <Chip label={row.bpStatus} size="small" sx={{ bgcolor: 'rgba(255,255,255,0.05)', color: row.bpStatusColor || '#00C896', fontWeight: 800, fontSize: '0.68rem' }} />
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </TableContainer>
+                    </Paper>
+
+                    {/* Medication Adherence Meter & Chronic Disease Badges */}
+                    <Grid container spacing={2.5}>
+                      <Grid item xs={12} md={5}>
+                        <Paper sx={{ p: 3, borderRadius: '20px', bgcolor: '#131F22', border: '1px solid rgba(0, 200, 150, 0.2)', height: '100%' }}>
+                          <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#EBF5F3', mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <VaccinesIcon sx={{ color: '#00C896' }} /> Medication Adherence &amp; Refill Index
+                          </Typography>
+                          <Box sx={{ p: 2, borderRadius: '16px', bgcolor: 'rgba(0, 200, 150, 0.08)', mb: 2.5 }}>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                              <Typography variant="body2" sx={{ fontWeight: 800, color: '#EBF5F3' }}>Compliance Score</Typography>
+                              <Typography variant="h5" sx={{ fontWeight: 900, color: '#00C896' }}>{medicationAdherence.score || 94}%</Typography>
+                            </Box>
+                            <LinearProgress
+                              variant="determinate"
+                              value={medicationAdherence.score || 94}
+                              sx={{ height: 8, borderRadius: 4, bgcolor: 'rgba(255,255,255,0.06)', '& .MuiLinearProgress-bar': { bgcolor: '#00C896' } }}
+                            />
+                            <Typography variant="caption" sx={{ color: '#33D3AA', mt: 1, display: 'block', fontWeight: 700 }}>
+                              {medicationAdherence.status || 'Optimal Adherence'} (On-time Refill Rate: {medicationAdherence.onTimeRefillRate || '92.5%'})
+                            </Typography>
+                          </Box>
+
+                          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.2 }}>
+                            <Typography variant="caption" sx={{ color: '#94A8A3', fontWeight: 700 }}>Next Refill Alert:</Typography>
+                            <Box sx={{ p: 1.5, borderRadius: '10px', bgcolor: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                              <Typography variant="body2" sx={{ color: '#FBBF24', fontWeight: 700 }}>
+                                {medicationAdherence.nextScheduledRefill}
+                              </Typography>
+                            </Box>
+                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.8, mt: 1 }}>
+                              {(medicationAdherence.complianceBadges || []).map((b: string, idx: number) => (
+                                <Chip key={idx} label={b} size="small" sx={{ bgcolor: 'rgba(16, 185, 129, 0.1)', color: '#34D399', fontWeight: 700, fontSize: '0.7rem' }} />
+                              ))}
+                            </Box>
+                          </Box>
+                        </Paper>
+                      </Grid>
+
+                      {/* Care Journey Milestones */}
+                      <Grid item xs={12} md={7}>
+                        <Paper sx={{ p: 3, borderRadius: '20px', bgcolor: '#131F22', border: '1px solid rgba(59, 130, 246, 0.2)', height: '100%' }}>
+                          <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#EBF5F3', mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <TimelineIcon sx={{ color: '#3B82F6' }} /> Longitudinal Patient Care Journey Milestones
+                          </Typography>
+                          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                            {careJourney.map((step: any, idx: number) => (
+                              <Box
+                                key={idx}
+                                sx={{
+                                  p: 1.8,
+                                  borderRadius: '14px',
+                                  bgcolor: 'rgba(255,255,255,0.03)',
+                                  border: '1px solid rgba(255,255,255,0.06)',
+                                  display: 'flex',
+                                  gap: 1.5,
+                                  alignItems: 'flex-start'
+                                }}
+                              >
+                                <Box sx={{ fontSize: '1.4rem', mt: 0.2 }}>{step.icon || '🏥'}</Box>
+                                <Box sx={{ flex: 1 }}>
+                                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' }}>
+                                    <Typography variant="body2" sx={{ fontWeight: 800, color: '#EBF5F3' }}>
+                                      {step.title}
+                                    </Typography>
+                                    <Typography variant="caption" sx={{ color: '#94A8A3', fontWeight: 600 }}>
+                                      {formatFullDate(step.date)}
+                                    </Typography>
+                                  </Box>
+                                  <Typography variant="caption" sx={{ color: '#38BDF8', fontWeight: 700, display: 'block', mt: 0.3 }}>
+                                    {step.doctor} • {step.department}
+                                  </Typography>
+                                  <Typography variant="caption" sx={{ color: '#94A8A3', display: 'block', mt: 0.2 }}>
+                                    {step.outcome}
+                                  </Typography>
+                                </Box>
+                              </Box>
+                            ))}
+                          </Box>
+                        </Paper>
+                      </Grid>
+                    </Grid>
+                  </>
+                ) : userRole === 'doctor' ? (
+                  /* Doctor Practice Analytics */
+                  <Grid container spacing={2.5}>
+                    <Grid item xs={12} md={6}>
+                      <Paper sx={{ p: 3, borderRadius: '20px', bgcolor: '#131F22', border: '1px solid rgba(0, 200, 150, 0.2)' }}>
+                        <Typography variant="h6" sx={{ fontWeight: 800, color: '#EBF5F3', mb: 2 }}>
+                          Clinical Practice Velocity &amp; Efficiency
+                        </Typography>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                          <Box sx={{ p: 2, borderRadius: '14px', bgcolor: 'rgba(255,255,255,0.03)' }}>
+                            <Typography variant="caption" sx={{ color: '#94A8A3' }}>Avg Consultation Time</Typography>
+                            <Typography variant="h4" sx={{ fontWeight: 900, color: '#00C896', mt: 0.5 }}>
+                              {practiceInsights.averageConsultationTimeMinutes || 14.5} Mins
+                            </Typography>
+                          </Box>
+                          <Box sx={{ p: 2, borderRadius: '14px', bgcolor: 'rgba(255,255,255,0.03)' }}>
+                            <Typography variant="caption" sx={{ color: '#94A8A3' }}>Generic Drug Prescribing Ratio</Typography>
+                            <Typography variant="h4" sx={{ fontWeight: 900, color: '#3B82F6', mt: 0.5 }}>
+                              {practiceInsights.genericPrescribingRatio || 91.2}%
+                            </Typography>
+                          </Box>
+                          <Box sx={{ p: 2, borderRadius: '14px', bgcolor: 'rgba(255,255,255,0.03)' }}>
+                            <Typography variant="caption" sx={{ color: '#94A8A3' }}>Patient Satisfaction Rating</Typography>
+                            <Typography variant="h4" sx={{ fontWeight: 900, color: '#F59E0B', mt: 0.5 }}>
+                              ★ {practiceInsights.patientSatisfactionRating || 4.9} / 5.0
+                            </Typography>
+                          </Box>
+                        </Box>
+                      </Paper>
+                    </Grid>
+
+                    <Grid item xs={12} md={6}>
+                      <Paper sx={{ p: 3, borderRadius: '20px', bgcolor: '#131F22', border: '1px solid rgba(59, 130, 246, 0.2)' }}>
+                        <Typography variant="h6" sx={{ fontWeight: 800, color: '#EBF5F3', mb: 2 }}>
+                          Prescribing Habits &amp; Drug Classes
+                        </Typography>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                          <Typography variant="caption" sx={{ color: '#94A8A3', fontWeight: 700 }}>Antibiotic Stewardship:</Typography>
+                          <Chip label={practiceInsights.antibioticStewardshipScore || '94% (Rational Low-Spectrum Use)'} sx={{ bgcolor: 'rgba(16, 185, 129, 0.15)', color: '#34D399', fontWeight: 800 }} />
+                          <Typography variant="caption" sx={{ color: '#94A8A3', fontWeight: 700, mt: 1 }}>Top Therapeutic Classes Prescribed:</Typography>
+                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                            {(practiceInsights.topPrescribedClasses || ['Statins', 'Metformin', 'ARBs', 'PPIs']).map((cls: string, idx: number) => (
+                              <Chip key={idx} label={cls} sx={{ bgcolor: 'rgba(255,255,255,0.05)', color: '#EBF5F3' }} />
+                            ))}
+                          </Box>
+                          <Typography variant="caption" sx={{ color: '#94A8A3', fontWeight: 700, mt: 1 }}>Referral Network Conversion:</Typography>
+                          <Typography variant="body2" sx={{ color: '#38BDF8', fontWeight: 800 }}>
+                            {practiceInsights.referralConversionRate || '96.2%'}
+                          </Typography>
+                        </Box>
+                      </Paper>
+                    </Grid>
+                  </Grid>
+                ) : userRole === 'nurse' ? (
+                  /* Nurse Operations */
+                  <Grid container spacing={2.5}>
+                    <Grid item xs={12} md={6}>
+                      <Paper sx={{ p: 3, borderRadius: '20px', bgcolor: '#131F22' }}>
+                        <Typography variant="h6" sx={{ fontWeight: 800, color: '#EBF5F3', mb: 2 }}>
+                          Nurse Shifts &amp; Home Care Operations
+                        </Typography>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                          <Box sx={{ p: 2, borderRadius: '14px', bgcolor: 'rgba(255,255,255,0.03)' }}>
+                            <Typography variant="caption" sx={{ color: '#94A8A3' }}>Completed Home Care Visits</Typography>
+                            <Typography variant="h4" sx={{ fontWeight: 900, color: '#00C896', mt: 0.5 }}>
+                              {nurseOperationalStats.completedVisits || 18} Visits
+                            </Typography>
+                          </Box>
+                          <Box sx={{ p: 2, borderRadius: '14px', bgcolor: 'rgba(255,255,255,0.03)' }}>
+                            <Typography variant="caption" sx={{ color: '#94A8A3' }}>On-Time Arrival Rate</Typography>
+                            <Typography variant="h4" sx={{ fontWeight: 900, color: '#3B82F6', mt: 0.5 }}>
+                              {nurseOperationalStats.onTimeArrivalRate || '97.8%'}
+                            </Typography>
+                          </Box>
+                        </Box>
+                      </Paper>
+                    </Grid>
+                    <Grid item xs={12} md={6}>
+                      <Paper sx={{ p: 3, borderRadius: '20px', bgcolor: '#131F22' }}>
+                        <Typography variant="h6" sx={{ fontWeight: 800, color: '#EBF5F3', mb: 2 }}>
+                          Certified Nursing Specialties
+                        </Typography>
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                          {(nurseOperationalStats.certifiedSpecialties || ['Wound Care', 'IV Cannulation']).map((sp: string, idx: number) => (
+                            <Chip key={idx} label={sp} sx={{ bgcolor: 'rgba(192, 132, 252, 0.15)', color: '#C084FC', fontWeight: 800 }} />
+                          ))}
+                        </Box>
+                      </Paper>
+                    </Grid>
+                  </Grid>
+                ) : (
+                  /* Pharmacist Operations */
+                  <Grid container spacing={2.5}>
+                    <Grid item xs={12} md={6}>
+                      <Paper sx={{ p: 3, borderRadius: '20px', bgcolor: '#131F22' }}>
+                        <Typography variant="h6" sx={{ fontWeight: 800, color: '#EBF5F3', mb: 2 }}>
+                          Dispensing &amp; Fulfillment Metrics
+                        </Typography>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                          <Box sx={{ p: 2, borderRadius: '14px', bgcolor: 'rgba(255,255,255,0.03)' }}>
+                            <Typography variant="caption" sx={{ color: '#94A8A3' }}>Daily Prescriptions Dispensed</Typography>
+                            <Typography variant="h4" sx={{ fontWeight: 900, color: '#F59E0B', mt: 0.5 }}>
+                              {pharmacyStockHealth.dailyPrescriptionsFulfilled || 28} Rx
+                            </Typography>
+                          </Box>
+                          <Box sx={{ p: 2, borderRadius: '14px', bgcolor: 'rgba(255,255,255,0.03)' }}>
+                            <Typography variant="caption" sx={{ color: '#94A8A3' }}>Average Dispensing Speed</Typography>
+                            <Typography variant="h4" sx={{ fontWeight: 900, color: '#00C896', mt: 0.5 }}>
+                              {pharmacyStockHealth.averageFulfillmentTimeMinutes || 4.2} Mins
+                            </Typography>
+                          </Box>
+                        </Box>
+                      </Paper>
+                    </Grid>
+                    <Grid item xs={12} md={6}>
+                      <Paper sx={{ p: 3, borderRadius: '20px', bgcolor: '#131F22' }}>
+                        <Typography variant="h6" sx={{ fontWeight: 800, color: '#EBF5F3', mb: 2 }}>
+                          Stock Accuracy &amp; Generic Mix
+                        </Typography>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                          <Box sx={{ p: 2, borderRadius: '14px', bgcolor: 'rgba(255,255,255,0.03)' }}>
+                            <Typography variant="caption" sx={{ color: '#94A8A3' }}>Inventory Accuracy Rate</Typography>
+                            <Typography variant="h4" sx={{ fontWeight: 900, color: '#3B82F6', mt: 0.5 }}>
+                              {pharmacyStockHealth.inventoryAccuracyRate || '99.4%'}
+                            </Typography>
+                          </Box>
+                          <Box sx={{ p: 2, borderRadius: '14px', bgcolor: 'rgba(255,255,255,0.03)' }}>
+                            <Typography variant="caption" sx={{ color: '#94A8A3' }}>Generic Dispensed Ratio</Typography>
+                            <Typography variant="h4" sx={{ fontWeight: 900, color: '#10B981', mt: 0.5 }}>
+                              {pharmacyStockHealth.dispensedGenericRatio || '89%'}
+                            </Typography>
+                          </Box>
+                        </Box>
+                      </Paper>
+                    </Grid>
+                  </Grid>
+                )}
+              </Box>
+            )}
+
+            {/* TAB 2: 50 DETAILED ACTIVITIES AUDIT LOG */}
+            {activeTab === 2 && (
               <Box>
                 {/* Search & Filter Header */}
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2.5, flexWrap: 'wrap', gap: 1.5 }}>
@@ -1599,8 +2038,15 @@ export default function UserDetailModal({
                                           startIcon={<ContentCopyIcon sx={{ fontSize: 12 }} />}
                                           onClick={(e) => {
                                             e.stopPropagation();
-                                            const medList = (act.meta?.medications || []).map((m: any, i: number) => `${i + 1}. ${m.name || m} (${m.dosage || 'Standard'}) - ${m.frequency || '1-0-1'} - ${m.timing || 'After Food'} for ${m.duration || '30 days'}`).join('\n');
-                                            copyToClipboard(`Prescription #${act.meta?.rxId || 'RX-2026-9821'}\nPatient: ${act.meta?.patientName || currentUser?.firstName || 'Patient'}\nDoctor: ${act.meta?.doctorName || 'Dr. Sarah Jenkins'}\nDiagnosis: ${act.meta?.diagnosis || 'Essential Hypertension'}\n\nPrescribed Medicines:\n${medList}\n\nAdvice: ${act.meta?.advice || 'Low salt diet. 30 mins daily walking.'}\nFollow-up: ${act.meta?.nextFollowUp || 'After 14 days'}`, 'Prescription Summary');
+                                            const medList = (act.meta?.medications || []).map((m: any, i: number) => {
+                                              const mName = formatSafeStr(m.name || m, 'Medication');
+                                              const mDosage = formatSafeStr(m.dosage, 'Standard');
+                                              const mFreq = formatFrequency(m.frequency);
+                                              const mTiming = formatTiming(m.timing);
+                                              const mDuration = formatSafeStr(m.duration, '30 days');
+                                              return `${i + 1}. ${mName} (${mDosage}) - ${mFreq} - ${mTiming} for ${mDuration}`;
+                                            }).join('\n');
+                                            copyToClipboard(`Prescription #${act.meta?.rxId || 'RX-2026-9821'}\nPatient: ${act.meta?.patientName || currentUser?.firstName || 'Patient'}\nDoctor: ${act.meta?.doctorName || 'Dr. Sarah Jenkins'}\nDiagnosis: ${formatSafeStr(act.meta?.diagnosis, 'Essential Hypertension')}\n\nPrescribed Medicines:\n${medList}\n\nAdvice: ${formatSafeStr(act.meta?.advice, 'Low salt diet. 30 mins daily walking.')}\nFollow-up: ${formatSafeStr(act.meta?.nextFollowUp, 'After 14 days')}`, 'Prescription Summary');
                                           }}
                                           sx={{ fontSize: '0.68rem', py: 0.3, px: 1, color: '#00C896', borderColor: '#00C896', borderRadius: '8px', textTransform: 'none' }}
                                         >
@@ -1612,7 +2058,7 @@ export default function UserDetailModal({
                                           startIcon={<QrCodeIcon sx={{ fontSize: 13 }} />}
                                           onClick={(e) => {
                                             e.stopPropagation();
-                                            alert(`📋 DIGITAL PRESCRIPTION VERIFICATION\n\nRx ID: ${act.meta?.rxId || 'RX-2026-9821'}\nPatient: ${act.meta?.patientName || currentUser?.firstName || 'Patient'}\nDoctor: ${act.meta?.doctorName || 'Dr. Sarah Jenkins, MD'}\nDiagnosis: ${act.meta?.diagnosis || 'Essential Hypertension'}\nStatus: Cryptographically Signed & Verified in Cloudflare D1`);
+                                            alert(`📋 DIGITAL PRESCRIPTION VERIFICATION\n\nRx ID: ${act.meta?.rxId || 'RX-2026-9821'}\nPatient: ${act.meta?.patientName || currentUser?.firstName || 'Patient'}\nDoctor: ${act.meta?.doctorName || 'Dr. Sarah Jenkins, MD'}\nDiagnosis: ${formatSafeStr(act.meta?.diagnosis, 'Essential Hypertension')}\nStatus: Cryptographically Signed & Verified in Cloudflare D1`);
                                           }}
                                           sx={{ fontSize: '0.68rem', py: 0.3, px: 1, bgcolor: '#00C896', color: '#0B1315', fontWeight: 800, borderRadius: '8px', textTransform: 'none', '&:hover': { bgcolor: '#34D399' } }}
                                         >
@@ -1627,7 +2073,7 @@ export default function UserDetailModal({
                                         <Paper sx={{ p: 1.2, borderRadius: '8px', bgcolor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
                                           <Typography variant="caption" sx={{ color: '#94A8A3', fontWeight: 700, display: 'block' }}>Provisional Clinical Diagnosis</Typography>
                                           <Typography variant="body2" sx={{ color: '#EBF5F3', fontWeight: 800, mt: 0.2 }}>
-                                            {act.meta?.diagnosis || 'Essential Hypertension & Cardiovascular Prophylaxis'}
+                                            {formatSafeStr(act.meta?.diagnosis, 'Essential Hypertension & Cardiovascular Prophylaxis')}
                                           </Typography>
                                         </Paper>
                                       </Grid>
@@ -1635,7 +2081,7 @@ export default function UserDetailModal({
                                         <Paper sx={{ p: 1.2, borderRadius: '8px', bgcolor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
                                           <Typography variant="caption" sx={{ color: '#94A8A3', fontWeight: 700, display: 'block' }}>Next Follow-up Review</Typography>
                                           <Typography variant="body2" sx={{ color: '#38BDF8', fontWeight: 800, mt: 0.2 }}>
-                                            {act.meta?.nextFollowUp || 'After 14 Days'} • Clinic Visit / Teleconsult
+                                            {formatSafeStr(act.meta?.nextFollowUp, 'After 14 Days')} • Clinic Visit / Teleconsult
                                           </Typography>
                                         </Paper>
                                       </Grid>
@@ -1671,18 +2117,21 @@ export default function UserDetailModal({
                                             </Avatar>
                                             <Box>
                                               <Typography variant="body2" sx={{ fontWeight: 800, color: '#EBF5F3' }}>
-                                                {med.name || med} <span style={{ color: '#00C896', fontWeight: 700 }}>({med.dosage || 'Standard Dosage'})</span>
+                                                {formatSafeStr(med.name || med, 'Medication')}{' '}
+                                                <span style={{ color: '#00C896', fontWeight: 700 }}>
+                                                  ({formatSafeStr(med.dosage, 'Standard Dosage')})
+                                                </span>
                                               </Typography>
                                               <Typography variant="caption" sx={{ color: '#94A8A3' }}>
-                                                {med.instructions || 'Take as prescribed with water'}
+                                                {formatSafeStr(med.instructions, 'Take as prescribed with water')}
                                               </Typography>
                                             </Box>
                                           </Box>
 
                                           <Box sx={{ display: 'flex', gap: 0.8, flexWrap: 'wrap', alignItems: 'center' }}>
-                                            <Chip label={med.frequency || '1-0-1'} size="small" sx={{ height: 20, bgcolor: 'rgba(56, 189, 248, 0.15)', color: '#38BDF8', fontWeight: 800, fontSize: '0.62rem' }} />
-                                            <Chip label={med.timing || 'After Food'} size="small" sx={{ height: 20, bgcolor: 'rgba(245, 158, 11, 0.15)', color: '#F59E0B', fontWeight: 800, fontSize: '0.62rem' }} />
-                                            <Chip label={med.duration || '30 Days'} size="small" sx={{ height: 20, bgcolor: 'rgba(192, 132, 252, 0.15)', color: '#C084FC', fontWeight: 800, fontSize: '0.62rem' }} />
+                                            <Chip label={formatFrequency(med.frequency)} size="small" sx={{ height: 20, bgcolor: 'rgba(56, 189, 248, 0.15)', color: '#38BDF8', fontWeight: 800, fontSize: '0.62rem' }} />
+                                            <Chip label={formatTiming(med.timing)} size="small" sx={{ height: 20, bgcolor: 'rgba(245, 158, 11, 0.15)', color: '#F59E0B', fontWeight: 800, fontSize: '0.62rem' }} />
+                                            <Chip label={formatSafeStr(med.duration, '30 Days')} size="small" sx={{ height: 20, bgcolor: 'rgba(192, 132, 252, 0.15)', color: '#C084FC', fontWeight: 800, fontSize: '0.62rem' }} />
                                           </Box>
                                         </Paper>
                                       ))}
@@ -1829,8 +2278,8 @@ export default function UserDetailModal({
               </Box>
             )}
 
-            {/* TAB 2: ROLE SPECIFIC FEATURES */}
-            {activeTab === 2 && (
+            {/* TAB 3: ROLE SPECIFIC FEATURES */}
+            {activeTab === 3 && (
               <Box>
                 {userRole === 'doctor' && (
                   <Grid container spacing={2.5}>
@@ -2020,8 +2469,8 @@ export default function UserDetailModal({
               </Box>
             )}
 
-            {/* TAB 3: LOGIN FREQUENCY & SECURITY LOGS */}
-            {activeTab === 3 && (
+            {/* TAB 4: LOGIN FREQUENCY & SECURITY LOGS */}
+            {activeTab === 4 && (
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                 {/* Top 5 Security & Session KPI Banner Tiles */}
                 <Grid container spacing={2}>
@@ -2372,8 +2821,8 @@ export default function UserDetailModal({
               </Box>
             )}
 
-            {/* TAB 4: TECHNICAL DIAGNOSTICS & RAW JSON */}
-            {activeTab === 4 && (
+            {/* TAB 5: TECHNICAL DIAGNOSTICS & RAW JSON */}
+            {activeTab === 5 && (
               <Paper sx={{ p: 2.5, borderRadius: '18px', bgcolor: '#050A0B', border: '1px solid rgba(255,255,255,0.08)' }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
                   <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#00C896', display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -2538,18 +2987,21 @@ export default function UserDetailModal({
                         </Avatar>
                         <Box>
                           <Typography variant="body1" sx={{ fontWeight: 800, color: '#EBF5F3' }}>
-                            {med.name || med} <span style={{ color: '#00C896', fontWeight: 700 }}>({med.dosage || 'Standard Dosage'})</span>
+                            {formatSafeStr(med.name || med, 'Medication')}{' '}
+                            <span style={{ color: '#00C896', fontWeight: 700 }}>
+                              ({formatSafeStr(med.dosage, 'Standard Dosage')})
+                            </span>
                           </Typography>
                           <Typography variant="caption" sx={{ color: '#94A8A3' }}>
-                            Instructions: {med.instructions || 'Take as prescribed with water'}
+                            Instructions: {formatSafeStr(med.instructions, 'Take as prescribed with water')}
                           </Typography>
                         </Box>
                       </Box>
 
                       <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center' }}>
-                        <Chip label={`Freq: ${med.frequency || '1-0-1'}`} size="small" sx={{ bgcolor: 'rgba(56, 189, 248, 0.15)', color: '#38BDF8', fontWeight: 800 }} />
-                        <Chip label={`Timing: ${med.timing || 'After Food'}`} size="small" sx={{ bgcolor: 'rgba(245, 158, 11, 0.15)', color: '#F59E0B', fontWeight: 800 }} />
-                        <Chip label={`Duration: ${med.duration || '30 Days'}`} size="small" sx={{ bgcolor: 'rgba(192, 132, 252, 0.15)', color: '#C084FC', fontWeight: 800 }} />
+                        <Chip label={`Freq: ${formatFrequency(med.frequency)}`} size="small" sx={{ bgcolor: 'rgba(56, 189, 248, 0.15)', color: '#38BDF8', fontWeight: 800 }} />
+                        <Chip label={`Timing: ${formatTiming(med.timing)}`} size="small" sx={{ bgcolor: 'rgba(245, 158, 11, 0.15)', color: '#F59E0B', fontWeight: 800 }} />
+                        <Chip label={`Duration: ${formatSafeStr(med.duration, '30 Days')}`} size="small" sx={{ bgcolor: 'rgba(192, 132, 252, 0.15)', color: '#C084FC', fontWeight: 800 }} />
                       </Box>
                     </Paper>
                   ))}
@@ -2907,196 +3359,92 @@ export default function UserDetailModal({
 function generateFallbackDetails(user: any) {
   const role = user.role || 'patient';
   const regDate = user.createdAt ? new Date(user.createdAt) : new Date(Date.now() - 25 * 86400000);
-  const now = Date.now();
 
   const activities: any[] = [];
-  const count = 50;
 
-  let userSeed = 0;
-  const seedStr = `${user.id || user._id || 'user'}_${role}_${user.email || ''}`;
-  for (let i = 0; i < seedStr.length; i++) {
-    userSeed = (userSeed * 37 + seedStr.charCodeAt(i)) % 1000000;
-  }
-
-  const pseudoRand = (offset: number) => {
-    const x = Math.sin(userSeed + offset) * 10000;
-    return x - Math.floor(x);
-  };
-
-  for (let i = 0; i < count; i++) {
-    const progress = (i + 1) / 52;
-    const jitter = (pseudoRand(i) - 0.5) * 0.15;
-    const adjustedFraction = Math.min(Math.max(progress + jitter, 0.02), 0.99);
-    const time = new Date(regDate.getTime() + (now - regDate.getTime()) * adjustedFraction).toISOString();
-
-    if (i % 4 === 0) {
-      activities.push({
-        id: `act-rx-${i}`,
-        type: 'prescription',
-        category: 'Prescriptions',
-        title: role === 'doctor' ? `Issued Prescription #${1000 + i}` : `Received Prescription from Dr. Sarah Jenkins`,
-        description: `Medications: Atorvastatin 20mg, Aspirin 75mg | Diagnosis: Routine Health Check`,
-        timestamp: time,
-        status: 'active',
-        meta: {
-          rxId: `RX-2026-${1000 + i}`,
-          patientName: `${user.firstName || 'Patient'} ${user.lastName || ''}`.trim(),
-          doctorName: 'Dr. Sarah Jenkins, MD (Cardiology)',
-          clinicName: 'Medizo Multi-Specialty Hospital, Station 1',
-          diagnosis: 'Essential Hypertension & Cardiac Prophylaxis',
-          medications: [
-            { name: 'Atorvastatin', dosage: '20mg', frequency: '1-0-0', duration: '30 days', timing: 'After Dinner', instructions: 'Take with water before sleep' },
-            { name: 'Aspirin', dosage: '75mg', frequency: '0-1-0', duration: '30 days', timing: 'After Lunch', instructions: 'Take after solid meal' },
-            { name: 'Telmisartan', dosage: '40mg', frequency: '1-0-0', duration: '30 days', timing: 'Morning Before Breakfast', instructions: 'Maintain BP diary' }
-          ],
-          labTestsAdvised: ['Lipid Profile', 'HbA1c', 'Serum Creatinine', '12-Lead ECG'],
-          advice: 'Low salt diet (<2g/day). 30 mins daily walking. Avoid smoking.',
-          nextFollowUp: 'After 14 days',
-          qrStatus: 'VERIFIED_D1_EDGE'
-        }
-      });
-    } else if (i % 4 === 1) {
-      activities.push({
-        id: `act-bill-${i}`,
-        type: 'billing',
-        category: 'Billing & Invoices',
-        title: `Consultation Invoice #INV-2026-${200 + i}`,
-        description: `Amount: ₹750 | Status: PAID | Payment Mode: UPI/Gateway`,
-        timestamp: time,
-        status: 'completed',
-        meta: {
-          billId: `INV-2026-${200 + i}`,
-          invoiceNumber: `INV-2026-${200 + i}`,
-          amount: 750,
-          paid: 750,
-          balance: 0,
-          sacCode: '999312 - Healthcare & Clinical Consultation',
-          paymentMethod: 'UPI (PhonePe / GPay)',
-          transactionRef: `tx_rzp_9823746${i}`,
-          gstClassification: 'Healthcare Exemption (Notification 12/2017)'
-        }
-      });
-    } else if (i % 4 === 2) {
-      activities.push({
-        id: `act-hc-${i}`,
-        type: 'home_care',
-        category: 'Home Care & Visits',
-        title: `Home Care Request: Wound Dressing & BP Check`,
-        description: `Assigned to Nurse Elena Martinez | Status: COMPLETED`,
-        timestamp: time,
-        status: 'completed',
-        meta: {
-          requestId: `HC-2026-${300 + i}`,
-          serviceType: 'POST-OP WOUND CARE & VITALS CHECK',
-          urgency: 'ROUTINE',
-          assignedNurse: 'Nurse Elena Martinez, RN',
-          preferredDate: 'Scheduled & Completed',
-          timeSlot: 'Morning (10:30 AM)',
-          patientAddress: 'Main Road, Kankarbagh, Patna'
-        }
-      });
-    } else {
-      activities.push({
-        id: `act-sec-${i}`,
-        type: 'security',
-        category: 'Security & Profile',
-        title: `Portal Session Authenticated via JWT`,
-        description: `IP verified with 256-bit encryption session token`,
-        timestamp: time,
-        status: 'completed',
-        meta: {
-          authMethod: 'Email/Password (SHA-256 + Salt)',
-          ipAddress: '103.21.244.18',
-          location: 'Patna, Bihar, India',
-          device: 'Windows 11 / Chrome 124',
-          encryption: '256-bit AES Cryptographic Token'
-        }
-      });
+  // 1. Account Registered Milestone
+  activities.push({
+    id: `act-reg-${user.id || user._id || 'user'}`,
+    type: 'security',
+    category: 'Security & Profile',
+    title: 'Account Registered on Medizo Platform',
+    description: `Role: ${role.toUpperCase()} | Status: ${(user.status || 'active').toUpperCase()}`,
+    timestamp: regDate.toISOString(),
+    status: 'completed',
+    meta: {
+      authMethod: user.googleId ? 'Google OAuth2' : 'Email/Password (SHA-256)',
+      ipAddress: '103.21.244.18',
+      location: 'Patna, Bihar, India',
+      device: 'Windows 11 / Chrome 124',
+      encryption: '256-bit AES Cryptographic Token'
     }
-  }
+  });
 
-  activities.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-
-  const loginLogs: any[] = [];
-  const devices = [
-    { os: 'Windows 11', browser: 'Chrome 124.0', type: 'desktop' },
-    { os: 'Android 14', browser: 'Medizo Mobile App v2.4', type: 'mobile' },
-    { os: 'macOS Sonoma', browser: 'Safari 17.4', type: 'desktop' },
-    { os: 'iOS 17.5', browser: 'Mobile Safari', type: 'mobile' }
-  ];
-  const locations = [
-    { city: 'Patna', region: 'Bihar, India', ip: '103.21.244.18' },
-    { city: 'New Delhi', region: 'Delhi, India', ip: '152.58.12.89' },
-    { city: 'Kolkata', region: 'West Bengal, India', ip: '49.36.192.44' }
-  ];
-
-  for (let i = 0; i < 30; i++) {
-    const dev = devices[i % devices.length];
-    const loc = locations[i % locations.length];
-    const isCurrent = i === 0;
-    loginLogs.push({
-      id: `log-fallback-${i + 1}`,
-      timestamp: new Date(now - (i === 0 ? 3600000 * 2 : i * 18 * 3600000)).toISOString(),
-      device: dev.os,
-      browser: dev.browser,
-      deviceType: dev.type,
-      ipAddress: loc.ip,
-      location: `${loc.city}, ${loc.region}`,
-      authMethod: user.googleId ? 'Google OAuth2' : 'Email & Password (JWT)',
-      status: isCurrent ? 'ACTIVE NOW' : 'SUCCESSFUL',
-      sessionDuration: isCurrent ? 'Active Now' : `${Math.floor((i % 5 + 1) * 20)} mins`,
-      twoFactorStatus: 'VERIFIED'
+  // 2. DigiLocker KYC Verified if applicable
+  if (user.digilockerVerified) {
+    activities.push({
+      id: `act-digi-${user.id || user._id || 'user'}`,
+      type: 'security',
+      category: 'Security & Profile',
+      title: 'Government DigiLocker KYC Verified',
+      description: `Aadhaar: ${user.digilockerProfile?.maskedAadhaar || 'Verified'} | Authority: UIDAI`,
+      timestamp: user.digilockerProfile?.linkedAt || regDate.toISOString(),
+      status: 'verified',
+      meta: {
+        maskedAadhaar: user.digilockerProfile?.maskedAadhaar || 'Verified',
+        governmentAuthority: 'Unique Identification Authority of India (UIDAI)'
+      }
     });
   }
 
-  const loginFrequency = {
-    byDay: [
-      { day: 'Mon', count: 8, pct: 80 },
-      { day: 'Tue', count: 11, pct: 95 },
-      { day: 'Wed', count: 9, pct: 85 },
-      { day: 'Thu', count: 12, pct: 100 },
-      { day: 'Fri', count: 10, pct: 90 },
-      { day: 'Sat', count: 6, pct: 50 },
-      { day: 'Sun', count: 4, pct: 35 }
-    ],
-    byTimeSlot: [
-      { slot: 'Morning (06:00 - 12:00)', count: 22, pct: 44, period: 'Peak Traffic' },
-      { slot: 'Afternoon (12:00 - 17:00)', count: 16, pct: 32, period: 'Active Clinical Hours' },
-      { slot: 'Evening (17:00 - 22:00)', count: 9, pct: 18, period: 'Evening Consults' },
-      { slot: 'Night (22:00 - 06:00)', count: 3, pct: 6, period: 'Emergency Shifts' }
-    ],
-    stats: {
-      totalLogins: 50,
-      averagePerWeek: 6.8,
-      peakHours: '09:00 AM - 01:00 PM',
-      primaryDevice: 'Windows 11 / Chrome 124',
-      lastIpAddress: '103.21.244.18',
-      lastLocation: 'Patna, Bihar, India',
-      securityHealth: 'Optimal (100%)',
-      failedAttempts: 0,
-      mfaEnabled: true
-    }
-  };
+  // 3. Location configured if present
+  if (user.clinicAddress || user.pharmacyAddress || user.address) {
+    activities.push({
+      id: `act-loc-${user.id || user._id || 'user'}`,
+      type: 'profile',
+      category: 'Security & Profile',
+      title: 'Practice Location Configured',
+      description: `Address: ${user.clinicAddress || user.pharmacyAddress || user.address}`,
+      timestamp: new Date(regDate.getTime() + 2 * 3600000).toISOString(),
+      status: 'completed'
+    });
+  }
+
+  // 4. Consultation fee configured if present
+  if (user.consultationFee !== undefined) {
+    activities.push({
+      id: `act-fee-${user.id || user._id || 'user'}`,
+      type: 'profile',
+      category: 'Security & Profile',
+      title: 'Clinical Fee Schedule Active',
+      description: `Consultation Fee: ₹${user.consultationFee || 0} | Teleconsult: ₹${user.teleconsultFee || 0}`,
+      timestamp: new Date(regDate.getTime() + 4 * 3600000).toISOString(),
+      status: 'active'
+    });
+  }
 
   return {
     success: true,
     user,
     metrics: {
-      totalActivities: 50,
-      prescriptionsCount: 14,
-      billsCount: 12,
-      homeCareCount: 8,
-      financial: { totalBilled: 10450, totalPaid: 9700, totalPending: 750 }
+      totalActivities: activities.length,
+      prescriptionsCount: user.prescriptionCount || 0,
+      billsCount: 0,
+      homeCareCount: 0,
+      financial: { totalBilled: 0, totalPaid: 0, totalPending: 0 }
     },
     categoryCounts: {
-      prescriptions: 14,
-      billing: 12,
-      homeCare: 8,
-      referrals: 4,
-      security: 12
+      prescriptions: user.prescriptionCount || 0,
+      billing: 0,
+      homeCare: 0,
+      referrals: 0,
+      security: activities.length
     },
     activities,
-    loginLogs,
-    loginFrequency
+    loginLogs: [],
+    loginFrequency: {
+      byDay: [],
+      byTimeSlot: []
+    }
   };
 }

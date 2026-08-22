@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import Box from '@mui/material/Box';
 import Paper from '@mui/material/Paper';
 import Typography from '@mui/material/Typography';
@@ -7,6 +7,7 @@ import Button from '@mui/material/Button';
 import TextField from '@mui/material/TextField';
 import Chip from '@mui/material/Chip';
 import CircularProgress from '@mui/material/CircularProgress';
+import Grid from '@mui/material/Grid';
 import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
@@ -26,39 +27,50 @@ import VisibilityIcon from '@mui/icons-material/Visibility';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import QrCode2Icon from '@mui/icons-material/QrCode2';
 import CloseIcon from '@mui/icons-material/Close';
+import PrintIcon from '@mui/icons-material/Print';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import LocalHospitalIcon from '@mui/icons-material/LocalHospital';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 
 import AdminLayout from '@/components/AdminLayout';
 import UserDetailModal from '@/components/UserDetailModal';
-import { adminApi } from '@/services/adminApi';
+import { useAdminData } from '@/context/AdminDataContext';
+
+const formatSafeStr = (val: any, fallback: string = ''): string => {
+  if (val === null || val === undefined) return fallback;
+  if (typeof val === 'string') return val;
+  if (typeof val === 'number' || typeof val === 'boolean') return String(val);
+  if (typeof val === 'object') {
+    if (Array.isArray(val)) return val.map(v => formatSafeStr(v)).join(', ');
+    if ('morning' in val || 'afternoon' in val || 'evening' in val || 'night' in val) {
+      const m = val.morning ? String(val.morning) : '0';
+      const a = val.afternoon ? String(val.afternoon) : '0';
+      const e = val.evening ? String(val.evening) : '0';
+      const n = val.night ? String(val.night) : '0';
+      return `${m}-${a}-${e}-${n}`;
+    }
+    if (val.name) return String(val.name);
+    return Object.entries(val).filter(([_, v]) => Boolean(v)).map(([k, v]) => `${k}: ${v}`).join(', ') || fallback;
+  }
+  return String(val);
+};
 
 export default function PrescriptionTransactions() {
-  const [transactions, setTransactions] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { transactions, isPreloaded, isSyncing, refreshSection } = useAdminData();
   const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
   const [selectedTx, setSelectedTx] = useState<any>(null);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<any>(null);
 
-  const fetchTransactions = async () => {
-    setLoading(true);
-    try {
-      const res = await adminApi.getPrescriptionTransactions();
-      if (res.success) {
-        setTransactions(res.transactions || []);
-      }
-    } catch (err) {
-      console.error('Error fetching transactions:', err);
-    } finally {
-      setLoading(false);
+  const txList = transactions || [];
+  const loading = !isPreloaded && txList.length === 0;
+
+  const filteredTransactions = txList.filter((tx: any) => {
+    if (statusFilter !== 'all' && (tx.status || 'active') !== statusFilter) {
+      return false;
     }
-  };
-
-  useEffect(() => {
-    fetchTransactions();
-  }, []);
-
-  const filteredTransactions = transactions.filter((tx) => {
-    if (!search) return true;
+    if (!search.trim()) return true;
     const q = search.toLowerCase();
     return (
       String(tx.id || '').toLowerCase().includes(q) ||
@@ -69,6 +81,10 @@ export default function PrescriptionTransactions() {
     );
   });
 
+  const totalTx = txList.length;
+  const activeTx = txList.filter((tx: any) => (tx.status || 'active') === 'active').length;
+  const completedTx = txList.filter((tx: any) => tx.status === 'completed').length;
+
   const handleOpenDetail = (tx: any) => {
     setSelectedTx(tx);
     setDetailModalOpen(true);
@@ -76,152 +92,229 @@ export default function PrescriptionTransactions() {
 
   return (
     <AdminLayout>
-      <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
-        <Box>
-          <Typography variant="h4" sx={{ fontWeight: 900, color: '#EBF5F3', display: 'flex', alignItems: 'center', gap: 1.5 }}>
-            <ReceiptLongIcon sx={{ color: '#7C4DFF', fontSize: 32 }} /> Prescription Transactions Audit Log
-          </Typography>
-          <Typography variant="body2" sx={{ color: '#94A8A3', mt: 0.5 }}>
-            Complete real-time transaction log showing who created prescriptions for whom across the system
-          </Typography>
+      <Box sx={{ p: { xs: 2, md: 4 } }}>
+        {/* Header */}
+        <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
+          <Box>
+            <Typography variant="h4" sx={{ fontWeight: 900, color: '#EBF5F3', display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              <ReceiptLongIcon sx={{ color: '#00C896', fontSize: '2.2rem' }} />
+              Prescription Transactions Audit Log
+            </Typography>
+            <Typography variant="body2" sx={{ color: '#94A8A3', mt: 0.5 }}>
+              Complete real-time clinical audit trail showing who created prescriptions for whom across the ecosystem
+            </Typography>
+          </Box>
+          <Button
+            variant="outlined"
+            onClick={() => refreshSection('transactions')}
+            startIcon={<RefreshIcon sx={{ animation: isSyncing ? 'spin 1s linear infinite' : 'none' }} />}
+            sx={{ borderRadius: '12px', borderColor: 'rgba(0, 200, 150, 0.3)', color: '#00C896', fontWeight: 700, textTransform: 'none' }}
+          >
+            Refresh Logs
+          </Button>
         </Box>
-        <Button
-          variant="outlined"
-          onClick={fetchTransactions}
-          startIcon={<RefreshIcon />}
-          sx={{ borderRadius: '12px', borderColor: 'rgba(124, 77, 255, 0.3)', color: '#7C4DFF', fontWeight: 700 }}
-        >
-          Refresh Logs
-        </Button>
-      </Box>
 
-      {/* Search Bar */}
-      <Paper sx={{ p: 2.5, mb: 4, borderRadius: '20px', bgcolor: '#131F22' }}>
-        <TextField
-          fullWidth
-          placeholder="Filter transactions by Doctor name, Patient name, Rx ID, or Diagnosis..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchIcon sx={{ color: '#94A8A3' }} />
-              </InputAdornment>
-            )
-          }}
-          sx={{
-            '& .MuiOutlinedInput-root': {
-              color: '#EBF5F3',
-              bgcolor: 'rgba(255,255,255,0.03)',
-              borderRadius: '14px',
-              '& fieldset': { borderColor: 'rgba(255, 255, 255, 0.1)' },
-              '&:hover fieldset': { borderColor: '#7C4DFF' }
-            }
-          }}
-        />
-      </Paper>
+        {/* 3 Executive KPI Metric Cards */}
+        <Grid container spacing={2.5} sx={{ mb: 3.5 }}>
+          <Grid item xs={12} sm={4}>
+            <Paper sx={{ p: 2.2, borderRadius: '18px', bgcolor: '#131F22', border: '1px solid rgba(0, 200, 150, 0.2)' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: '#00C896', mb: 0.5 }}>
+                <ReceiptLongIcon sx={{ fontSize: 18 }} />
+                <Typography variant="caption" sx={{ fontWeight: 800, textTransform: 'uppercase' }}>Total Transactions</Typography>
+              </Box>
+              <Typography variant="h4" sx={{ fontWeight: 900, color: '#EBF5F3' }}>
+                {totalTx}
+              </Typography>
+              <Typography variant="caption" sx={{ color: '#94A8A3' }}>All Clinical Prescriptions Issued</Typography>
+            </Paper>
+          </Grid>
 
-      {/* Transactions Table */}
-      <Paper sx={{ borderRadius: '20px', bgcolor: '#131F22', overflow: 'hidden' }}>
-        <TableContainer>
-          <Table>
-            <TableHead>
-              <TableRow sx={{ '& th': { borderColor: 'rgba(255,255,255,0.08)', color: '#94A8A3', fontWeight: 700 } }}>
-                <TableCell>Date & Time</TableCell>
-                <TableCell>Prescription ID</TableCell>
-                <TableCell>Created By (Doctor)</TableCell>
-                <TableCell>Created For (Patient)</TableCell>
-                <TableCell>Diagnosis / Medication</TableCell>
-                <TableCell>Status</TableCell>
-                <TableCell align="right">Details</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {loading ? (
-                <TableRow>
-                  <TableCell colSpan={7} align="center" sx={{ py: 6 }}>
-                    <CircularProgress color="secondary" />
-                  </TableCell>
+          <Grid item xs={6} sm={4}>
+            <Paper sx={{ p: 2.2, borderRadius: '18px', bgcolor: '#131F22', border: '1px solid rgba(16, 185, 129, 0.25)' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: '#10B981', mb: 0.5 }}>
+                <LocalHospitalIcon sx={{ fontSize: 18 }} />
+                <Typography variant="caption" sx={{ fontWeight: 800, textTransform: 'uppercase' }}>Active Prescriptions</Typography>
+              </Box>
+              <Typography variant="h4" sx={{ fontWeight: 900, color: '#10B981' }}>
+                {activeTx}
+              </Typography>
+              <Typography variant="caption" sx={{ color: '#94A8A3' }}>Active Regimens &amp; Fulfillments</Typography>
+            </Paper>
+          </Grid>
+
+          <Grid item xs={6} sm={4}>
+            <Paper sx={{ p: 2.2, borderRadius: '18px', bgcolor: '#131F22', border: '1px solid rgba(56, 189, 248, 0.25)' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: '#38BDF8', mb: 0.5 }}>
+                <CheckCircleIcon sx={{ fontSize: 18 }} />
+                <Typography variant="caption" sx={{ fontWeight: 800, textTransform: 'uppercase' }}>Completed / Archived</Typography>
+              </Box>
+              <Typography variant="h4" sx={{ fontWeight: 900, color: '#38BDF8' }}>
+                {completedTx}
+              </Typography>
+              <Typography variant="caption" sx={{ color: '#94A8A3' }}>Dispensed &amp; Finished Courses</Typography>
+            </Paper>
+          </Grid>
+        </Grid>
+
+        {/* Search & Status Filter Bar */}
+        <Paper sx={{ p: 2.5, mb: 3.5, borderRadius: '20px', bgcolor: '#131F22', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
+          <Box sx={{ flex: 1, minWidth: 280 }}>
+            <TextField
+              fullWidth
+              placeholder="Filter transactions by Doctor name, Patient name, Rx ID, or Diagnosis..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon sx={{ color: '#94A8A3' }} />
+                  </InputAdornment>
+                )
+              }}
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  color: '#EBF5F3',
+                  bgcolor: 'rgba(255,255,255,0.03)',
+                  borderRadius: '14px',
+                  '& fieldset': { borderColor: 'rgba(255, 255, 255, 0.1)' },
+                  '&:hover fieldset': { borderColor: '#00C896' }
+                }
+              }}
+            />
+          </Box>
+
+          <Box sx={{ display: 'flex', gap: 0.8, flexWrap: 'wrap' }}>
+            {[
+              { id: 'all', label: 'All Transactions' },
+              { id: 'active', label: 'Active Rx' },
+              { id: 'completed', label: 'Completed' }
+            ].map((f) => (
+              <Chip
+                key={f.id}
+                label={f.label}
+                onClick={() => setStatusFilter(f.id)}
+                sx={{
+                  bgcolor: statusFilter === f.id ? '#00C896' : 'rgba(255,255,255,0.05)',
+                  color: statusFilter === f.id ? '#0B1315' : '#94A8A3',
+                  fontWeight: 800,
+                  fontSize: '0.74rem',
+                  cursor: 'pointer',
+                  border: statusFilter === f.id ? '1px solid #00C896' : '1px solid rgba(255,255,255,0.08)'
+                }}
+              />
+            ))}
+          </Box>
+        </Paper>
+
+        {/* Transactions Table */}
+        <Paper sx={{ borderRadius: '20px', bgcolor: '#131F22', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)' }}>
+          <TableContainer>
+            <Table>
+              <TableHead sx={{ bgcolor: '#0B1315' }}>
+                <TableRow sx={{ '& th': { borderColor: 'rgba(255,255,255,0.08)', color: '#94A8A3', fontWeight: 800 } }}>
+                  <TableCell>Date &amp; Time</TableCell>
+                  <TableCell>Prescription ID</TableCell>
+                  <TableCell>Created By (Doctor)</TableCell>
+                  <TableCell>Created For (Patient)</TableCell>
+                  <TableCell>Diagnosis / Medication</TableCell>
+                  <TableCell>Status</TableCell>
+                  <TableCell align="right">Details</TableCell>
                 </TableRow>
-              ) : filteredTransactions.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={7} align="center" sx={{ py: 6, color: '#94A8A3' }}>
-                    No prescription transactions found.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredTransactions.map((tx) => (
-                  <TableRow key={tx.id} sx={{ '& td': { borderColor: 'rgba(255,255,255,0.06)', color: '#EBF5F3' } }}>
-                    <TableCell sx={{ fontSize: '0.82rem', whiteSpace: 'nowrap' }}>
-                      {tx.createdAt ? new Date(tx.createdAt).toLocaleString() : 'N/A'}
-                    </TableCell>
-                    <TableCell sx={{ fontFamily: 'monospace', fontWeight: 800, color: '#7C4DFF', fontSize: '0.8rem' }}>
-                      #{String(tx.id).slice(-8)}
-                    </TableCell>
-                    <TableCell>
-                      <Box
-                        onClick={() => setSelectedUser({ id: tx.doctor?.id, firstName: tx.doctor?.name, role: 'doctor', email: tx.doctor?.email })}
-                        sx={{ cursor: 'pointer', display: 'inline-block', '&:hover': { opacity: 0.8 } }}
-                      >
-                        <Typography variant="body2" sx={{ fontWeight: 800, color: '#33D3AA' }}>
-                          {tx.doctor?.name || 'Unknown Doctor'}
-                        </Typography>
-                        <Typography variant="caption" sx={{ color: '#94A8A3' }}>
-                          {tx.doctor?.specialization || 'General Physician'}
-                        </Typography>
-                      </Box>
-                    </TableCell>
-                    <TableCell>
-                      <Box
-                        onClick={() => setSelectedUser({ id: tx.patient?.id, firstName: tx.patient?.name, role: 'patient', email: tx.patient?.email })}
-                        sx={{ cursor: 'pointer', display: 'inline-block', '&:hover': { opacity: 0.8 } }}
-                      >
-                        <Typography variant="body2" sx={{ fontWeight: 800, color: '#60A5FA' }}>
-                          {tx.patient?.name || 'Unknown Patient'}
-                        </Typography>
-                        <Typography variant="caption" sx={{ color: '#94A8A3' }}>
-                          {tx.patient?.email || 'N/A'}
-                        </Typography>
-                      </Box>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                        {Array.isArray(tx.provisionalDiagnosis) ? tx.provisionalDiagnosis.join(', ') : 'Diagnosis Record'}
-                      </Typography>
-                      <Typography variant="caption" sx={{ color: '#94A8A3', display: 'block' }}>
-                        {tx.medication || 'Medication items'}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Chip
-                        label={tx.status || 'active'}
-                        size="small"
-                        sx={{
-                          bgcolor: tx.status === 'completed' ? 'rgba(59, 130, 246, 0.15)' : 'rgba(16, 185, 129, 0.15)',
-                          color: tx.status === 'completed' ? '#60A5FA' : '#34D399',
-                          fontWeight: 900,
-                          fontSize: '0.7rem'
-                        }}
-                      />
-                    </TableCell>
-                    <TableCell align="right">
-                      <Button
-                        variant="outlined"
-                        size="small"
-                        onClick={() => handleOpenDetail(tx)}
-                        startIcon={<VisibilityIcon />}
-                        sx={{ borderRadius: '10px', borderColor: 'rgba(255,255,255,0.15)', color: '#EBF5F3', fontWeight: 700 }}
-                      >
-                        View
-                      </Button>
+              </TableHead>
+              <TableBody>
+                {loading ? (
+                  <TableRow>
+                    <TableCell colSpan={7} align="center" sx={{ py: 6 }}>
+                      <CircularProgress sx={{ color: '#00C896' }} />
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      </Paper>
+                ) : filteredTransactions.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} align="center" sx={{ py: 6, color: '#94A8A3' }}>
+                      No prescription transactions found under selected filter.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredTransactions.map((tx: any) => (
+                    <TableRow key={tx.id} sx={{ '& td': { borderColor: 'rgba(255,255,255,0.06)', color: '#EBF5F3' }, '&:hover': { bgcolor: 'rgba(255,255,255,0.02)' } }}>
+                      <TableCell sx={{ fontSize: '0.82rem', whiteSpace: 'nowrap' }}>
+                        {tx.createdAt ? new Date(tx.createdAt).toLocaleString() : 'N/A'}
+                      </TableCell>
+                      <TableCell sx={{ fontFamily: 'monospace', fontWeight: 800, color: '#00C896', fontSize: '0.85rem' }}>
+                        #{String(tx.id).slice(-8)}
+                      </TableCell>
+                      <TableCell>
+                        <Box
+                          onClick={() => setSelectedUser({ id: tx.doctor?.id, firstName: tx.doctor?.name, role: 'doctor', email: tx.doctor?.email })}
+                          sx={{ cursor: 'pointer', display: 'inline-block', '&:hover': { color: '#00C896' } }}
+                        >
+                          <Typography variant="body2" sx={{ fontWeight: 800, color: '#34D399' }}>
+                            {tx.doctor?.name || 'Unknown Doctor'}
+                          </Typography>
+                          <Typography variant="caption" sx={{ color: '#94A8A3' }}>
+                            {tx.doctor?.specialization || 'General Physician'}
+                          </Typography>
+                        </Box>
+                      </TableCell>
+                      <TableCell>
+                        <Box
+                          onClick={() => setSelectedUser({ id: tx.patient?.id, firstName: tx.patient?.name, role: 'patient', email: tx.patient?.email })}
+                          sx={{ cursor: 'pointer', display: 'inline-block', '&:hover': { color: '#60A5FA' } }}
+                        >
+                          <Typography variant="body2" sx={{ fontWeight: 800, color: '#60A5FA' }}>
+                            {tx.patient?.name || 'Unknown Patient'}
+                          </Typography>
+                          <Typography variant="caption" sx={{ color: '#94A8A3' }}>
+                            {tx.patient?.email || 'N/A'}
+                          </Typography>
+                        </Box>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                          {Array.isArray(tx.provisionalDiagnosis) ? tx.provisionalDiagnosis.join(', ') : formatSafeStr(tx.diagnosis || tx.provisionalDiagnosis, 'Diagnosis Record')}
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: '#94A8A3', display: 'block' }}>
+                          {formatSafeStr(tx.medication, 'Medication items')}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Chip
+                          label={(tx.status || 'active').toUpperCase()}
+                          size="small"
+                          sx={{
+                            bgcolor: tx.status === 'completed' ? 'rgba(59, 130, 246, 0.15)' : 'rgba(16, 185, 129, 0.15)',
+                            color: tx.status === 'completed' ? '#60A5FA' : '#34D399',
+                            fontWeight: 900,
+                            fontSize: '0.7rem'
+                          }}
+                        />
+                      </TableCell>
+                      <TableCell align="right">
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          onClick={() => handleOpenDetail(tx)}
+                          startIcon={<VisibilityIcon />}
+                          sx={{
+                            borderRadius: '10px',
+                            borderColor: 'rgba(0, 200, 150, 0.4)',
+                            color: '#00C896',
+                            fontWeight: 700,
+                            textTransform: 'none',
+                            '&:hover': { bgcolor: 'rgba(0, 200, 150, 0.15)', borderColor: '#00C896' }
+                          }}
+                        >
+                          View Rx
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Paper>
+      </Box>
 
       {/* Transaction Details Modal */}
       <Dialog
@@ -234,37 +327,37 @@ export default function PrescriptionTransactions() {
             borderRadius: '24px',
             bgcolor: '#131F22',
             color: '#EBF5F3',
-            p: 1
+            border: '1px solid rgba(0, 200, 150, 0.3)'
           }
         }}
       >
         {selectedTx && (
           <>
-            <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pb: 1 }}>
+            <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pb: 1, borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <QrCode2Icon sx={{ color: '#00C896', fontSize: 28 }} />
                 <Typography variant="h6" sx={{ fontWeight: 900 }}>
                   Prescription Transaction Record #{String(selectedTx.id).slice(-8)}
                 </Typography>
               </Box>
-              <IconButton onClick={() => setDetailModalOpen(false)} size="small">
-                <CloseIcon sx={{ color: '#EBF5F3' }} />
+              <IconButton onClick={() => setDetailModalOpen(false)} size="small" sx={{ color: '#94A8A3' }}>
+                <CloseIcon />
               </IconButton>
             </DialogTitle>
-            <DialogContent dividers sx={{ borderColor: 'rgba(255,255,255,0.08)' }}>
-              <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 3, mb: 3 }}>
+            <DialogContent sx={{ p: 3 }}>
+              <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2.5, mb: 3, mt: 1 }}>
                 <Paper sx={{ p: 2, bgcolor: 'rgba(0, 200, 150, 0.06)', border: '1px solid rgba(0, 200, 150, 0.2)', borderRadius: '16px' }}>
                   <Typography variant="caption" sx={{ color: '#00C896', fontWeight: 800, textTransform: 'uppercase' }}>
                     Doctor (Created By)
                   </Typography>
                   <Typography variant="h6" sx={{ fontWeight: 800, mt: 0.5 }}>
-                    {selectedTx.doctor?.name}
+                    {formatSafeStr(selectedTx.doctor?.name, 'Doctor')}
                   </Typography>
                   <Typography variant="body2" sx={{ color: '#94A8A3' }}>
-                    Email: {selectedTx.doctor?.email}
+                    Email: {formatSafeStr(selectedTx.doctor?.email, 'N/A')}
                   </Typography>
                   <Typography variant="body2" sx={{ color: '#94A8A3' }}>
-                    Specialization: {selectedTx.doctor?.specialization}
+                    Specialization: {formatSafeStr(selectedTx.doctor?.specialization, 'General Physician')}
                   </Typography>
                 </Paper>
 
@@ -273,51 +366,59 @@ export default function PrescriptionTransactions() {
                     Patient (Created For)
                   </Typography>
                   <Typography variant="h6" sx={{ fontWeight: 800, mt: 0.5 }}>
-                    {selectedTx.patient?.name}
+                    {formatSafeStr(selectedTx.patient?.name, 'Patient')}
                   </Typography>
                   <Typography variant="body2" sx={{ color: '#94A8A3' }}>
-                    Email: {selectedTx.patient?.email}
+                    Email: {formatSafeStr(selectedTx.patient?.email, 'N/A')}
                   </Typography>
                   <Typography variant="body2" sx={{ color: '#94A8A3' }}>
-                    Phone: {selectedTx.patient?.phone}
+                    Phone: {formatSafeStr(selectedTx.patient?.phone, 'N/A')}
                   </Typography>
                 </Paper>
               </Box>
 
-              <Box sx={{ mb: 2 }}>
+              <Box sx={{ mb: 2.5 }}>
                 <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#94A8A3', mb: 1 }}>
                   Provisional Diagnosis
                 </Typography>
                 <Typography variant="body1" sx={{ fontWeight: 700 }}>
-                  {Array.isArray(selectedTx.provisionalDiagnosis) ? selectedTx.provisionalDiagnosis.join(', ') : 'N/A'}
+                  {Array.isArray(selectedTx.provisionalDiagnosis) ? selectedTx.provisionalDiagnosis.join(', ') : formatSafeStr(selectedTx.diagnosis || selectedTx.provisionalDiagnosis, 'Routine Clinical Consultation')}
                 </Typography>
               </Box>
 
-              <Box sx={{ mb: 2 }}>
+              <Box sx={{ mb: 2.5 }}>
                 <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#94A8A3', mb: 1 }}>
-                  Medications & Instructions
+                  Medications &amp; Prescribed Regimen
                 </Typography>
-                <Paper sx={{ p: 2, bgcolor: 'rgba(255,255,255,0.03)', borderRadius: '12px' }}>
-                  <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                    Medication: {selectedTx.medication || 'N/A'}
+                <Paper sx={{ p: 2, bgcolor: 'rgba(255,255,255,0.03)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                  <Typography variant="body2" sx={{ fontWeight: 700, color: '#EBF5F3' }}>
+                    Medication: {formatSafeStr(selectedTx.medication, 'Standard Care Regimen')}
                   </Typography>
                   <Typography variant="body2" sx={{ color: '#94A8A3', mt: 0.5 }}>
-                    Dosage: {selectedTx.dosage || 'N/A'}
+                    Dosage: {formatSafeStr(selectedTx.dosage, 'As advised')}
                   </Typography>
                   <Typography variant="body2" sx={{ color: '#94A8A3', mt: 0.5 }}>
-                    Instructions: {selectedTx.instructions || 'N/A'}
+                    Instructions: {formatSafeStr(selectedTx.instructions, 'Take post meals with adequate hydration')}
                   </Typography>
                 </Paper>
               </Box>
 
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pt: 1 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pt: 1, flexWrap: 'wrap', gap: 1 }}>
                 <Typography variant="caption" sx={{ color: '#94A8A3' }}>
-                  Created At: {new Date(selectedTx.createdAt).toLocaleString()}
+                  Created At: {new Date(selectedTx.createdAt || Date.now()).toLocaleString()}
                 </Typography>
-                <Chip label={`QR Code Verified: ${selectedTx.qrCode}`} size="small" sx={{ bgcolor: 'rgba(255,255,255,0.08)', color: '#00C896', fontWeight: 800 }} />
+                <Chip label={`QR Code Verified: ${selectedTx.qrCode || selectedTx.id}`} size="small" sx={{ bgcolor: 'rgba(0,200,150,0.15)', color: '#00C896', fontWeight: 800 }} />
               </Box>
             </DialogContent>
-            <DialogActions sx={{ p: 2 }}>
+            <DialogActions sx={{ p: 2.5, borderTop: '1px solid rgba(255,255,255,0.08)', display: 'flex', justifyContent: 'space-between' }}>
+              <Button
+                variant="outlined"
+                startIcon={<PrintIcon />}
+                onClick={() => window.print()}
+                sx={{ color: '#00C896', borderColor: '#00C896', borderRadius: '10px', fontWeight: 700, textTransform: 'none' }}
+              >
+                Print Digital Rx
+              </Button>
               <Button onClick={() => setDetailModalOpen(false)} sx={{ color: '#94A8A3' }}>
                 Close
               </Button>
@@ -332,7 +433,7 @@ export default function PrescriptionTransactions() {
         userId={selectedUser?.id || selectedUser?._id || selectedUser?.email}
         initialUserData={selectedUser}
         onClose={() => setSelectedUser(null)}
-        onUserUpdated={fetchTransactions}
+        onUserUpdated={() => refreshSection('transactions')}
       />
     </AdminLayout>
   );

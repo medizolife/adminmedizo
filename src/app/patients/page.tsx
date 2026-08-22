@@ -27,46 +27,41 @@ import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 
 import AdminLayout from '@/components/AdminLayout';
 import UserDetailModal from '@/components/UserDetailModal';
-import { adminApi } from '@/services/adminApi';
+import { useAdminData } from '@/context/AdminDataContext';
 
 export default function PatientsRoster() {
-  const [patients, setPatients] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { patients, isPreloaded, isSyncing, refreshSection, toggleUserStatusLocal, deleteUserLocal } = useAdminData();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedPatient, setSelectedPatient] = useState<any>(null);
   const [toastMessage, setToastMessage] = useState('');
 
-  const fetchPatients = async () => {
-    setLoading(true);
-    try {
-      const res = await adminApi.getUsers('patient', search, statusFilter);
-      if (res.success) {
-        setPatients(res.users || []);
-      }
-    } catch (err) {
-      console.error('Error fetching patients:', err);
-    } finally {
-      setLoading(false);
+  // Instant in-memory search and status filtering (0ms)
+  const filteredPatients = patients.filter((pat) => {
+    if (statusFilter !== 'all') {
+      const isDeactivated = pat.status === 'deactivated';
+      if (statusFilter === 'active' && isDeactivated) return false;
+      if (statusFilter === 'deactivated' && !isDeactivated) return false;
     }
-  };
-
-  useEffect(() => {
-    fetchPatients();
-  }, [statusFilter]);
-
-  const handleSearchSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    fetchPatients();
-  };
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      const match =
+        (pat.firstName && pat.firstName.toLowerCase().includes(q)) ||
+        (pat.lastName && pat.lastName.toLowerCase().includes(q)) ||
+        (pat.email && pat.email.toLowerCase().includes(q)) ||
+        (pat.phone && pat.phone.toLowerCase().includes(q));
+      if (!match) return false;
+    }
+    return true;
+  });
 
   const handleToggleStatus = async (patient: any) => {
+    const patId = patient.id || patient._id || patient.email;
     const newStatus = patient.status === 'deactivated' ? 'active' : 'deactivated';
     try {
-      const res = await adminApi.toggleUserStatus(patient.id || patient._id, newStatus);
-      if (res.success) {
+      const success = await toggleUserStatusLocal(patId, newStatus);
+      if (success) {
         setToastMessage(`Patient ${patient.firstName} ${patient.lastName} account is now ${newStatus.toUpperCase()}`);
-        fetchPatients();
       }
     } catch (err) {
       console.error('Error toggling status:', err);
@@ -84,10 +79,9 @@ export default function PatientsRoster() {
       return;
     }
     try {
-      const res = await adminApi.deleteUser(targetId);
-      if (res.success) {
+      const success = await deleteUserLocal(targetId);
+      if (success) {
         setToastMessage(`✅ Patient "${confirmName}" permanently deleted successfully!`);
-        fetchPatients();
       }
     } catch (err: any) {
       console.error('Error deleting patient:', err);
@@ -108,8 +102,8 @@ export default function PatientsRoster() {
         </Box>
         <Button
           variant="outlined"
-          onClick={fetchPatients}
-          startIcon={<RefreshIcon />}
+          onClick={() => refreshSection('patients')}
+          startIcon={<RefreshIcon sx={{ animation: isSyncing ? 'spin 1s linear infinite' : 'none' }} />}
           sx={{ borderRadius: '12px', borderColor: 'rgba(59, 130, 246, 0.3)', color: '#3B82F6', fontWeight: 700 }}
         >
           Refresh Roster
@@ -124,7 +118,7 @@ export default function PatientsRoster() {
 
       {/* Filter & Search Bar */}
       <Paper sx={{ p: 2.5, mb: 4, borderRadius: '20px', bgcolor: '#131F22', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
-        <Box component="form" onSubmit={handleSearchSubmit} sx={{ flex: 1, minWidth: 280 }}>
+        <Box sx={{ flex: 1, minWidth: 280 }}>
           <TextField
             fullWidth
             placeholder="Search patients by name, email, or phone..."
@@ -198,20 +192,20 @@ export default function PatientsRoster() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {loading ? (
+              {!isPreloaded && patients.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={6} align="center" sx={{ py: 6 }}>
                     <CircularProgress color="primary" />
                   </TableCell>
                 </TableRow>
-              ) : patients.length === 0 ? (
+              ) : filteredPatients.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={6} align="center" sx={{ py: 6, color: '#94A8A3' }}>
                     No patients found matching criteria.
                   </TableCell>
                 </TableRow>
               ) : (
-                patients.map((pat) => {
+                filteredPatients.map((pat) => {
                   const isDeactivated = pat.status === 'deactivated';
                   return (
                     <TableRow key={pat.id || pat._id} sx={{ '& td': { borderColor: 'rgba(255,255,255,0.06)', color: '#EBF5F3' } }}>
@@ -317,7 +311,7 @@ export default function PatientsRoster() {
         userId={selectedPatient?.id || selectedPatient?._id || selectedPatient?.email}
         initialUserData={selectedPatient}
         onClose={() => setSelectedPatient(null)}
-        onUserUpdated={fetchPatients}
+        onUserUpdated={() => refreshSection('patients')}
       />
     </AdminLayout>
   );

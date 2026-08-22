@@ -18,6 +18,7 @@ import ListItemIcon from '@mui/material/ListItemIcon';
 import ListItemText from '@mui/material/ListItemText';
 
 import DashboardIcon from '@mui/icons-material/Dashboard';
+import InsightsIcon from '@mui/icons-material/Insights';
 import MedicalServicesIcon from '@mui/icons-material/MedicalServices';
 import PeopleIcon from '@mui/icons-material/People';
 import LocalPharmacyIcon from '@mui/icons-material/LocalPharmacy';
@@ -32,6 +33,9 @@ import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import PaymentsIcon from '@mui/icons-material/Payments';
 import AssignmentIndIcon from '@mui/icons-material/AssignmentInd';
 
+import SyncIcon from '@mui/icons-material/Sync';
+import { useAdminData } from '@/context/AdminDataContext';
+
 const DRAWER_WIDTH = 260;
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -40,6 +44,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [mobileOpen, setMobileOpen] = useState(false);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [adminUser, setAdminUser] = useState<any>(null);
+  const { isPreloaded, isSyncing, preloadAll } = useAdminData();
 
   useEffect(() => {
     const userStr = localStorage.getItem('adminUser') || localStorage.getItem('user');
@@ -60,11 +65,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     localStorage.removeItem('adminUser');
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    try {
+      sessionStorage.removeItem('medizo_admin_portal_cache_v2');
+    } catch (e) {}
     router.push('/login');
   };
 
   const navItems = [
     { label: 'Overview', path: '/dashboard', icon: <DashboardIcon /> },
+    { label: 'Analytics & Insights', path: '/analytics', icon: <InsightsIcon /> },
     { label: 'Doctors Roster', path: '/doctors', icon: <MedicalServicesIcon /> },
     { label: 'Nurses Roster', path: '/nurses', icon: <HealingIcon /> },
     { label: 'Patients Roster', path: '/patients', icon: <PeopleIcon /> },
@@ -114,7 +123,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 bgcolor: isActive ? 'rgba(0, 200, 150, 0.15)' : 'transparent',
                 color: isActive ? '#00C896' : '#94A8A3',
                 border: isActive ? '1px solid rgba(0, 200, 150, 0.3)' : '1px solid transparent',
-                transition: 'all 0.2s ease',
+                transition: 'all 0.15s ease',
                 '&:hover': {
                   bgcolor: 'rgba(0, 200, 150, 0.1)',
                   color: '#EBF5F3'
@@ -195,10 +204,18 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
             <Chip
-              icon={<VerifiedUserIcon sx={{ fontSize: '14px !important', color: '#00C896 !important' }} />}
-              label="Live Cloudflare D1 System"
+              icon={<SyncIcon sx={{ fontSize: '14px !important', color: '#00C896 !important', animation: isSyncing ? 'spin 1s linear infinite' : 'none', '@keyframes spin': { '0%': { transform: 'rotate(0deg)' }, '100%': { transform: 'rotate(360deg)' } } }} />}
+              label={isSyncing ? 'Syncing...' : isPreloaded ? 'Memory Cache Active' : 'Loading...'}
               size="small"
-              sx={{ bgcolor: 'rgba(0, 200, 150, 0.12)', color: '#00C896', border: '1px solid rgba(0, 200, 150, 0.3)', fontWeight: 700 }}
+              onClick={() => preloadAll(true)}
+              sx={{
+                bgcolor: 'rgba(0, 200, 150, 0.12)',
+                color: '#00C896',
+                border: '1px solid rgba(0, 200, 150, 0.3)',
+                fontWeight: 700,
+                cursor: 'pointer',
+                '&:hover': { bgcolor: 'rgba(0, 200, 150, 0.2)' }
+              }}
             />
             <Avatar
               onClick={(e) => setAnchorEl(e.currentTarget)}
@@ -214,6 +231,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 sx: { bgcolor: '#131F22', border: '1px solid rgba(255,255,255,0.1)', color: '#EBF5F3', mt: 1, borderRadius: '12px' }
               }}
             >
+              <MenuItem onClick={() => { setAnchorEl(null); preloadAll(true); }} sx={{ fontWeight: 700, gap: 1 }}>
+                <SyncIcon fontSize="small" /> Force Refresh All Data
+              </MenuItem>
+              <Divider sx={{ borderColor: 'rgba(255,255,255,0.08)' }} />
               <MenuItem onClick={handleLogout} sx={{ color: '#EF4444', fontWeight: 700, gap: 1 }}>
                 <LogoutIcon fontSize="small" /> Sign Out
               </MenuItem>

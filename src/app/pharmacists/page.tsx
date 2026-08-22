@@ -33,10 +33,10 @@ import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import AdminLayout from '@/components/AdminLayout';
 import UserDetailModal from '@/components/UserDetailModal';
 import { adminApi } from '@/services/adminApi';
+import { useAdminData } from '@/context/AdminDataContext';
 
 export default function PharmacistsRoster() {
-  const [pharmacists, setPharmacists] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { pharmacists, isPreloaded, isSyncing, refreshSection, toggleUserStatusLocal, deleteUserLocal, addUserLocal } = useAdminData();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedPharmacist, setSelectedPharmacist] = useState<any>(null);
@@ -57,36 +57,33 @@ export default function PharmacistsRoster() {
     phone: ''
   });
 
-  const fetchPharmacists = async () => {
-    setLoading(true);
-    try {
-      const res = await adminApi.getUsers('pharmacist', search, statusFilter);
-      if (res.success) {
-        setPharmacists(res.users || []);
-      }
-    } catch (err) {
-      console.error('Error fetching pharmacists:', err);
-    } finally {
-      setLoading(false);
+  // Instant in-memory search and status filtering (0ms)
+  const filteredPharmacists = pharmacists.filter((pharm) => {
+    if (statusFilter !== 'all') {
+      const isDeactivated = pharm.status === 'deactivated';
+      if (statusFilter === 'active' && isDeactivated) return false;
+      if (statusFilter === 'deactivated' && !isDeactivated) return false;
     }
-  };
-
-  useEffect(() => {
-    fetchPharmacists();
-  }, [statusFilter]);
-
-  const handleSearchSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    fetchPharmacists();
-  };
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      const match =
+        (pharm.firstName && pharm.firstName.toLowerCase().includes(q)) ||
+        (pharm.lastName && pharm.lastName.toLowerCase().includes(q)) ||
+        (pharm.email && pharm.email.toLowerCase().includes(q)) ||
+        (pharm.pharmacyName && pharm.pharmacyName.toLowerCase().includes(q)) ||
+        (pharm.licenseNumber && pharm.licenseNumber.toLowerCase().includes(q));
+      if (!match) return false;
+    }
+    return true;
+  });
 
   const handleToggleStatus = async (pharmacist: any) => {
+    const pharmId = pharmacist.id || pharmacist._id || pharmacist.email;
     const newStatus = pharmacist.status === 'deactivated' ? 'active' : 'deactivated';
     try {
-      const res = await adminApi.toggleUserStatus(pharmacist.id || pharmacist._id, newStatus);
-      if (res.success) {
+      const success = await toggleUserStatusLocal(pharmId, newStatus);
+      if (success) {
         setToastMessage(`Pharmacist ${pharmacist.firstName} ${pharmacist.lastName} account is now ${newStatus.toUpperCase()}`);
-        fetchPharmacists();
       }
     } catch (err) {
       console.error('Error toggling status:', err);
@@ -104,10 +101,9 @@ export default function PharmacistsRoster() {
       return;
     }
     try {
-      const res = await adminApi.deleteUser(targetId);
-      if (res.success) {
+      const success = await deleteUserLocal(targetId);
+      if (success) {
         setToastMessage(`✅ Pharmacist account "${confirmName}" permanently deleted successfully!`);
-        fetchPharmacists();
       }
     } catch (err: any) {
       console.error('Error deleting pharmacist:', err);
@@ -127,6 +123,7 @@ export default function PharmacistsRoster() {
       if (res.success) {
         setAddModalOpen(false);
         setToastMessage(`Pharmacist ${newPharm.firstName} ${newPharm.lastName} created successfully!`);
+        addUserLocal({ ...newPharm, role: 'pharmacist', id: res.user?.id || Date.now().toString() });
         setNewPharm({
           firstName: '',
           lastName: '',
@@ -137,7 +134,7 @@ export default function PharmacistsRoster() {
           pharmacyAddress: '',
           phone: ''
         });
-        fetchPharmacists();
+        refreshSection('pharmacists');
       }
     } catch (err: any) {
       setModalError(err.response?.data?.message || 'Failed to create pharmacist');
@@ -160,8 +157,8 @@ export default function PharmacistsRoster() {
         <Box sx={{ display: 'flex', gap: 1.5 }}>
           <Button
             variant="outlined"
-            onClick={fetchPharmacists}
-            startIcon={<RefreshIcon />}
+            onClick={() => refreshSection('pharmacists')}
+            startIcon={<RefreshIcon sx={{ animation: isSyncing ? 'spin 1s linear infinite' : 'none' }} />}
             sx={{ borderRadius: '12px', borderColor: 'rgba(245, 158, 11, 0.3)', color: '#F59E0B', fontWeight: 700 }}
           >
             Refresh
@@ -185,7 +182,7 @@ export default function PharmacistsRoster() {
 
       {/* Filter & Search Bar */}
       <Paper sx={{ p: 2.5, mb: 4, borderRadius: '20px', bgcolor: '#131F22', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
-        <Box component="form" onSubmit={handleSearchSubmit} sx={{ flex: 1, minWidth: 280 }}>
+        <Box sx={{ flex: 1, minWidth: 280 }}>
           <TextField
             fullWidth
             placeholder="Search pharmacists by name, pharmacy, or license #..."
@@ -258,20 +255,20 @@ export default function PharmacistsRoster() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {loading ? (
+              {!isPreloaded && pharmacists.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={5} align="center" sx={{ py: 6 }}>
                     <CircularProgress color="primary" />
                   </TableCell>
                 </TableRow>
-              ) : pharmacists.length === 0 ? (
+              ) : filteredPharmacists.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={5} align="center" sx={{ py: 6, color: '#94A8A3' }}>
                     No pharmacists found matching criteria.
                   </TableCell>
                 </TableRow>
               ) : (
-                pharmacists.map((pharm) => {
+                filteredPharmacists.map((pharm) => {
                   const isDeactivated = pharm.status === 'deactivated';
                   return (
                     <TableRow key={pharm.id || pharm._id} sx={{ '& td': { borderColor: 'rgba(255,255,255,0.06)', color: '#EBF5F3' } }}>
@@ -470,7 +467,7 @@ export default function PharmacistsRoster() {
         userId={selectedPharmacist?.id || selectedPharmacist?._id || selectedPharmacist?.email}
         initialUserData={selectedPharmacist}
         onClose={() => setSelectedPharmacist(null)}
-        onUserUpdated={fetchPharmacists}
+        onUserUpdated={() => refreshSection('pharmacists')}
       />
     </AdminLayout>
   );

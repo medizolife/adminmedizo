@@ -93,9 +93,53 @@ export const adminApi = {
     return response.data;
   },
 
-  // Get complete 360-degree user profile, graph analytics, and 50-entry audit timeline
+  // Get complete 360-degree user profile, graph analytics, and audit timeline
   getUserDetails: async (userId: string) => {
     const response = await api.get(`/admin/users/${userId}/details`);
+    return response.data;
+  },
+
+  // Get complete platform dataset in a single high-speed bulk payload for instant client caching
+  getBootstrapData: async () => {
+    const response = await api.get('/admin/bootstrap');
+    return response.data;
+  },
+
+  // Get cross-platform clinical, epidemiological, revenue, and operational analytics
+  getComprehensiveAnalytics: async (range: string = '30d') => {
+    const response = await api.get('/admin/analytics/comprehensive', {
+      params: { range }
+    });
+    return response.data;
+  },
+
+  // Update home care request status
+  updateHomeCareStatus: async (requestId: string, status: string) => {
+    const response = await api.patch(`/admin/home-care/${requestId}/status`, { status });
+    return response.data;
+  },
+
+  // Assign nurse to home care request
+  assignNurseToHomeCare: async (requestId: string, nurseId: string) => {
+    const response = await api.post(`/admin/home-care/${requestId}/assign-nurse`, { nurseId });
+    return response.data;
+  },
+
+  // Update referral status
+  updateReferralStatus: async (referralId: string, status: string, responseNotes?: string) => {
+    const response = await api.patch(`/admin/referrals/${referralId}/status`, { status, responseNotes });
+    return response.data;
+  },
+
+  // Update bill status
+  updateBillStatus: async (billId: string, status: string, paymentData?: any) => {
+    const response = await api.patch(`/admin/billing/${billId}/status`, { status, ...(paymentData || {}) });
+    return response.data;
+  },
+
+  // Update nurse-patient assignment status
+  updateAssignmentStatus: async (assignmentId: string, status: string) => {
+    const response = await api.patch(`/admin/assignments/nurse/${assignmentId}/status`, { status });
     return response.data;
   }
 };

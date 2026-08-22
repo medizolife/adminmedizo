@@ -36,11 +36,10 @@ import AdminLayout from '@/components/AdminLayout';
 import UserDetailModal from '@/components/UserDetailModal';
 import { adminApi } from '@/services/adminApi';
 import { adminExtraApi } from '@/services/adminExtraApi';
+import { useAdminData } from '@/context/AdminDataContext';
 
 export default function NursesRoster() {
-  const [nurses, setNurses] = useState<any[]>([]);
-  const [doctors, setDoctors] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { nurses, doctors, isPreloaded, isSyncing, refreshSection, addUserLocal } = useAdminData();
   const [search, setSearch] = useState('');
   const [selectedNurse, setSelectedNurse] = useState<any>(null);
   const [profileNurse, setProfileNurse] = useState<any>(null);
@@ -65,26 +64,6 @@ export default function NursesRoster() {
   const [affiliationType, setAffiliationType] = useState('employed');
   const [affiliationNotes, setAffiliationNotes] = useState('');
 
-  const fetchData = async () => {
-    setLoading(true);
-    try {
-      const [nursesRes, docsRes] = await Promise.all([
-        adminExtraApi.getNurses(),
-        adminApi.getUsers('doctor')
-      ]);
-      if (nursesRes.success) setNurses(nursesRes.nurses || []);
-      if (docsRes.success) setDoctors(docsRes.users || []);
-    } catch (err) {
-      console.error('Error fetching nurses:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchData();
-  }, []);
-
   const handleCreateNurse = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -95,6 +74,7 @@ export default function NursesRoster() {
       if (res.success) {
         setToastMessage(`Nurse ${createForm.firstName} ${createForm.lastName} registered successfully`);
         setCreateDialogOpen(false);
+        addUserLocal({ ...createForm, role: 'nurse', id: res.user?.id || Date.now().toString() });
         setCreateForm({
           firstName: '',
           lastName: '',
@@ -105,7 +85,7 @@ export default function NursesRoster() {
           nurseSpecialization: '',
           nurseQualifications: ''
         });
-        fetchData();
+        refreshSection('nurses');
       }
     } catch (err: any) {
       alert(err.response?.data?.message || 'Failed to create nurse account');
@@ -125,7 +105,7 @@ export default function NursesRoster() {
       if (res.success) {
         setToastMessage('Affiliation created successfully');
         setAffiliationDialogOpen(false);
-        fetchData();
+        refreshSection('nurses');
       }
     } catch (err: any) {
       alert(err.response?.data?.message || 'Failed to link nurse');
@@ -160,9 +140,9 @@ export default function NursesRoster() {
           <Box sx={{ display: 'flex', gap: 1.5 }}>
             <Button
               variant="outlined"
-              onClick={fetchData}
-              startIcon={<RefreshIcon />}
-              sx={{ color: '#94A8A3', borderColor: 'rgba(255,255,255,0.15)', borderRadius: '12px', textTransform: 'none' }}
+              onClick={() => refreshSection('nurses')}
+              startIcon={<RefreshIcon sx={{ animation: isSyncing ? 'spin 1s linear infinite' : 'none' }} />}
+              sx={{ color: '#00C896', borderColor: 'rgba(0,200,150,0.3)', borderRadius: '12px', textTransform: 'none', fontWeight: 700 }}
             >
               Refresh
             </Button>
@@ -203,7 +183,7 @@ export default function NursesRoster() {
 
         {/* Table */}
         <Paper sx={{ bgcolor: '#131F22', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.08)', overflow: 'hidden' }}>
-          {loading ? (
+          {!isPreloaded && nurses.length === 0 ? (
             <Box sx={{ p: 6, display: 'flex', justifyContent: 'center' }}>
               <CircularProgress sx={{ color: '#00C896' }} />
             </Box>
@@ -416,7 +396,7 @@ export default function NursesRoster() {
           userId={profileNurse?.id || profileNurse?._id || profileNurse?.email}
           initialUserData={profileNurse}
           onClose={() => setProfileNurse(null)}
-          onUserUpdated={fetchData}
+          onUserUpdated={() => refreshSection('nurses')}
         />
       </Box>
     </AdminLayout>

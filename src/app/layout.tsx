@@ -1,5 +1,6 @@
 import React from 'react';
 import ThemeRegistry from '@/components/ThemeRegistry';
+import { AdminDataProvider } from '@/context/AdminDataContext';
 
 export const metadata = {
   title: 'Medizo Admin Portal',
@@ -11,7 +12,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body>
         <ThemeRegistry>
-          {children}
+          <AdminDataProvider>
+            {children}
+          </AdminDataProvider>
         </ThemeRegistry>
       </body>
     </html>

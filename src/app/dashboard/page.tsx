@@ -22,39 +22,20 @@ import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
 import VerifiedUserIcon from '@mui/icons-material/VerifiedUser';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import InsightsIcon from '@mui/icons-material/Insights';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 
 import AdminLayout from '@/components/AdminLayout';
 import UserDetailModal from '@/components/UserDetailModal';
-import { adminApi } from '@/services/adminApi';
+import { useAdminData } from '@/context/AdminDataContext';
 
 export default function DashboardOverview() {
   const router = useRouter();
-  const [stats, setStats] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [recentTransactions, setRecentTransactions] = useState<any[]>([]);
+  const { stats, transactions, isPreloaded, isSyncing, preloadAll } = useAdminData();
   const [selectedUser, setSelectedUser] = useState<any>(null);
 
-  const fetchDashboardData = async () => {
-    setLoading(true);
-    try {
-      const statsRes = await adminApi.getStats();
-      if (statsRes.success) {
-        setStats(statsRes.stats);
-      }
-      const txRes = await adminApi.getPrescriptionTransactions();
-      if (txRes.success) {
-        setRecentTransactions((txRes.transactions || []).slice(0, 5));
-      }
-    } catch (error) {
-      console.error('Error fetching dashboard stats:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchDashboardData();
-  }, []);
+  const recentTransactions = (transactions || []).slice(0, 5);
+  const loading = !isPreloaded && !stats;
 
   return (
     <AdminLayout>
@@ -69,8 +50,8 @@ export default function DashboardOverview() {
         </Box>
         <Button
           variant="outlined"
-          onClick={fetchDashboardData}
-          startIcon={<RefreshIcon />}
+          onClick={() => preloadAll(true)}
+          startIcon={<RefreshIcon sx={{ animation: isSyncing ? 'spin 1s linear infinite' : 'none' }} />}
           sx={{ borderRadius: '12px', borderColor: 'rgba(0, 200, 150, 0.3)', color: '#00C896', fontWeight: 700 }}
         >
           Refresh Data
@@ -219,14 +200,56 @@ export default function DashboardOverview() {
             </Grid>
           </Grid>
 
+          {/* New Analytics & Clinical Intelligence Banner */}
+          <Paper
+            sx={{
+              p: 3,
+              mb: 3,
+              borderRadius: '20px',
+              bgcolor: 'rgba(0, 200, 150, 0.08)',
+              border: '1.5px solid rgba(0, 200, 150, 0.35)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: 2,
+              boxShadow: '0 8px 30px rgba(0, 200, 150, 0.1)'
+            }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Box sx={{ p: 1.8, borderRadius: '16px', bgcolor: '#00C896', color: '#0B1315', display: 'flex' }}>
+                <InsightsIcon fontSize="large" />
+              </Box>
+              <Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Typography variant="h6" sx={{ fontWeight: 900, color: '#EBF5F3' }}>
+                    Cross-Platform Clinical &amp; Operational Intelligence Hub
+                  </Typography>
+                  <Chip label="NEW" size="small" sx={{ bgcolor: '#00C896', color: '#0B1315', fontWeight: 900, height: 20, fontSize: '0.65rem' }} />
+                </Box>
+                <Typography variant="body2" sx={{ color: '#94A8A3', mt: 0.3 }}>
+                  Epidemiological disease surveillance, revenue cycle analytics, patient retention funnels &amp; inventory expiry forecasting
+                </Typography>
+              </Box>
+            </Box>
+            <Button
+              variant="contained"
+              onClick={() => router.push('/analytics')}
+              endIcon={<ArrowForwardIcon />}
+              sx={{ bgcolor: '#00C896', color: '#0B1315', fontWeight: 800, borderRadius: '12px', px: 3 }}
+            >
+              Open Analytics Hub
+            </Button>
+          </Paper>
+
           {/* DigiLocker & Security Highlights Banner */}
           <Paper
             sx={{
               p: 3,
               mb: 4,
               borderRadius: '20px',
-              bgcolor: 'rgba(0, 200, 150, 0.05)',
-              border: '1px solid rgba(0, 200, 150, 0.2)',
+              bgcolor: 'rgba(0, 200, 150, 0.04)',
+              border: '1px solid rgba(0, 200, 150, 0.15)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
@@ -235,7 +258,7 @@ export default function DashboardOverview() {
             }}
           >
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <Box sx={{ p: 1.8, borderRadius: '16px', bgcolor: '#00C896', color: '#0B1315' }}>
+              <Box sx={{ p: 1.8, borderRadius: '16px', bgcolor: 'rgba(0, 200, 150, 0.2)', color: '#00C896' }}>
                 <VerifiedUserIcon fontSize="large" />
               </Box>
               <Box>
@@ -248,10 +271,10 @@ export default function DashboardOverview() {
               </Box>
             </Box>
             <Button
-              variant="contained"
+              variant="outlined"
               onClick={() => router.push('/doctors')}
               endIcon={<ArrowForwardIcon />}
-              sx={{ bgcolor: '#00C896', color: '#0B1315', fontWeight: 800, borderRadius: '12px' }}
+              sx={{ borderColor: '#00C896', color: '#00C896', fontWeight: 800, borderRadius: '12px' }}
             >
               Manage Verified Doctors
             </Button>
@@ -359,7 +382,7 @@ export default function DashboardOverview() {
         userId={selectedUser?.id || selectedUser?._id || selectedUser?.email}
         initialUserData={selectedUser}
         onClose={() => setSelectedUser(null)}
-        onUserUpdated={fetchDashboardData}
+        onUserUpdated={() => preloadAll(true)}
       />
     </AdminLayout>
   );
