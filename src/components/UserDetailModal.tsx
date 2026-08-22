@@ -98,6 +98,7 @@ export default function UserDetailModal({
   const [loginFilter, setLoginFilter] = useState<'all' | 'desktop' | 'mobile' | 'google' | 'active'>('all');
   const [loginSearch, setLoginSearch] = useState('');
   const [graphRange, setGraphRange] = useState<'6m' | '30d' | '7d'>('6m');
+  const [graphCategory, setGraphCategory] = useState<'all' | 'prescription' | 'billing' | 'home_care' | 'security'>('all');
   const [hoveredPoint, setHoveredPoint] = useState<any>(null);
 
   const fetchDetails = async () => {
@@ -213,22 +214,29 @@ export default function UserDetailModal({
   const loginLogs: any[] = data?.loginLogs || generateFallbackDetails(currentUser || {}).loginLogs || [];
   const loginFrequency: any = data?.loginFrequency || generateFallbackDetails(currentUser || {}).loginFrequency || {};
 
-  // Dynamic Graph Points Generator based on selected range ('7d' | '30d' | '6m')
+  // Dynamic Graph Points Generator based on selected range ('7d' | '30d' | '6m') and category filter
   const getGraphPoints = () => {
     const now = new Date();
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
+    // Filter activities by graphCategory if selected
+    const filteredByCat = graphCategory === 'all'
+      ? activities
+      : activities.filter((a: any) => a.type === graphCategory || (graphCategory === 'security' && a.type === 'profile'));
+
     if (graphRange === '7d') {
       const days = [];
       for (let i = 6; i >= 0; i--) {
-        const d = new Date(now);
-        d.setDate(d.getDate() - i);
-        const dayLabel = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-        const ymd = d.toISOString().split('T')[0];
-
-        const dayActs = activities.filter((a: any) => {
+        const targetDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+        const dayLabel = targetDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        
+        const dayActs = filteredByCat.filter((a: any) => {
           if (!a.timestamp) return false;
-          return String(a.timestamp).startsWith(ymd);
+          const aDate = new Date(a.timestamp);
+          if (isNaN(aDate.getTime())) return false;
+          return aDate.getFullYear() === targetDate.getFullYear() &&
+                 aDate.getMonth() === targetDate.getMonth() &&
+                 aDate.getDate() === targetDate.getDate();
         });
 
         const rx = dayActs.filter((a: any) => a.type === 'prescription').length;
@@ -238,7 +246,7 @@ export default function UserDetailModal({
 
         days.push({
           label: dayLabel,
-          searchKey: ymd,
+          searchKey: dayLabel,
           count: dayActs.length,
           rx,
           billing,
@@ -252,17 +260,15 @@ export default function UserDetailModal({
     if (graphRange === '30d') {
       const intervals = [];
       for (let i = 5; i >= 0; i--) {
-        const dStart = new Date(now);
-        dStart.setDate(dStart.getDate() - (i * 5 + 4));
-        const dEnd = new Date(now);
-        dEnd.setDate(dEnd.getDate() - (i * 5));
+        const dStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (i * 5 + 4), 0, 0, 0);
+        const dEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (i * 5), 23, 59, 59);
 
         const label = `${dStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${dEnd.toLocaleDateString('en-US', { day: 'numeric' })}`;
 
-        const bucketActs = activities.filter((a: any) => {
+        const bucketActs = filteredByCat.filter((a: any) => {
           if (!a.timestamp) return false;
           const t = new Date(a.timestamp).getTime();
-          return t >= dStart.getTime() && t <= dEnd.getTime() + 86400000;
+          return t >= dStart.getTime() && t <= dEnd.getTime();
         });
 
         const rx = bucketActs.filter((a: any) => a.type === 'prescription').length;
@@ -286,15 +292,16 @@ export default function UserDetailModal({
     // 6m: Last 6 Calendar Months computed purely from this user's activities
     const monthBuckets = [];
     for (let i = 5; i >= 0; i--) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const mName = months[d.getMonth()];
-      const yr = d.getFullYear();
+      const targetMonth = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const mName = months[targetMonth.getMonth()];
+      const yr = targetMonth.getFullYear();
       const label = `${mName} ${yr}`;
-      const ymPrefix = `${yr}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 
-      const mActs = activities.filter((a: any) => {
+      const mActs = filteredByCat.filter((a: any) => {
         if (!a.timestamp) return false;
-        return String(a.timestamp).startsWith(ymPrefix);
+        const aDate = new Date(a.timestamp);
+        if (isNaN(aDate.getTime())) return false;
+        return aDate.getFullYear() === yr && aDate.getMonth() === targetMonth.getMonth();
       });
 
       const rx = mActs.filter((a: any) => a.type === 'prescription').length;
@@ -363,15 +370,15 @@ export default function UserDetailModal({
     return true;
   });
 
-  // SVG Curved Area Chart Generator
+  // SVG Curved Area Chart Generator with Explicit Node Labels & Glow Styling
   const renderGraph = () => {
     const points = getGraphPoints();
 
     const width = 800;
-    const height = 220;
+    const height = 240;
     const padX = 60;
-    const padY = 40;
-    const maxVal = Math.max(...points.map((p: any) => p.count || 1), 10);
+    const padY = 45;
+    const maxVal = Math.max(...points.map((p: any) => p.count || 0), 5);
 
     const coords = points.map((p: any, i: number) => {
       const x = padX + (i / Math.max(points.length - 1, 1)) * (width - padX * 2);
@@ -390,22 +397,27 @@ export default function UserDetailModal({
 
     const areaD = `${pathD} L ${coords[coords.length - 1].x} ${height - padY} L ${coords[0].x} ${height - padY} Z`;
 
+    const themeColor = graphCategory === 'prescription' ? '#00C896' :
+                       graphCategory === 'billing' ? '#38BDF8' :
+                       graphCategory === 'home_care' ? '#C084FC' :
+                       graphCategory === 'security' ? '#34D399' : '#00C896';
+
     return (
       <Box sx={{ position: 'relative', width: '100%', overflowX: 'auto', py: 1 }}>
         <svg viewBox={`0 0 ${width} ${height}`} style={{ width: '100%', height: 'auto', minWidth: 600 }}>
           <defs>
-            <linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#00C896" stopOpacity="0.45" />
+            <linearGradient id="dynamicAreaGradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={themeColor} stopOpacity="0.45" />
               <stop offset="60%" stopColor="#3B82F6" stopOpacity="0.15" />
               <stop offset="100%" stopColor="#0B1315" stopOpacity="0" />
             </linearGradient>
-            <linearGradient id="lineGradient" x1="0" y1="0" x2="1" y2="0">
-              <stop offset="0%" stopColor="#00C896" />
+            <linearGradient id="dynamicLineGradient" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stopColor={themeColor} />
               <stop offset="50%" stopColor="#38BDF8" />
               <stop offset="100%" stopColor="#818CF8" />
             </linearGradient>
-            <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
-              <feGaussianBlur stdDeviation="3" result="coloredBlur" />
+            <filter id="glowEffect" x="-30%" y="-30%" width="160%" height="160%">
+              <feGaussianBlur stdDeviation="3.5" result="coloredBlur" />
               <feMerge>
                 <feMergeNode in="coloredBlur" />
                 <feMergeNode in="SourceGraphic" />
@@ -427,12 +439,13 @@ export default function UserDetailModal({
                   strokeDasharray="4 4"
                 />
                 <text
-                  x={padX - 10}
+                  x={padX - 12}
                   y={y + 4}
                   fill="#94A8A3"
-                  fontSize="10"
+                  fontSize="11"
+                  fontWeight="600"
                   textAnchor="end"
-                  fontFamily="sans-serif"
+                  fontFamily="monospace"
                 >
                   {Math.round(ratio * maxVal)}
                 </text>
@@ -440,91 +453,150 @@ export default function UserDetailModal({
             );
           })}
 
-          {/* Filled Area */}
-          <path d={areaD} fill="url(#areaGradient)" />
+          {/* Filled Area under curve */}
+          <path d={areaD} fill="url(#dynamicAreaGradient)" />
 
-          {/* Smooth Trend Line */}
+          {/* Smooth Trend Line with glow */}
           <path
             d={pathD}
             fill="none"
-            stroke="url(#lineGradient)"
-            strokeWidth="3.5"
+            stroke="url(#dynamicLineGradient)"
+            strokeWidth="4"
             strokeLinecap="round"
-            filter="url(#glow)"
+            filter="url(#glowEffect)"
           />
 
-          {/* Interactive Data Points */}
-          {coords.map((pt: any, idx: number) => (
-            <g
-              key={idx}
-              onMouseEnter={() => setHoveredPoint(pt)}
-              onMouseLeave={() => setHoveredPoint(null)}
-              style={{ cursor: 'pointer' }}
-            >
-              <circle
-                cx={pt.x}
-                cy={pt.y}
-                r="6"
-                fill="#0B1315"
-                stroke="#00C896"
-                strokeWidth="3"
-                style={{ transition: 'all 0.2s' }}
-              />
-              <circle
-                cx={pt.x}
-                cy={pt.y}
-                r="12"
-                fill="transparent"
-              />
-              {/* X Axis label */}
-              <text
-                x={pt.x}
-                y={height - 15}
-                fill="#94A8A3"
-                fontSize="11"
-                fontWeight="600"
-                textAnchor="middle"
+          {/* Interactive Data Points with Floating Value Badges */}
+          {coords.map((pt: any, idx: number) => {
+            const isHighlighted = hoveredPoint?.label === pt.label;
+            return (
+              <g
+                key={idx}
+                onClick={() => {
+                  if (pt.searchKey) {
+                    setActivitySearch(pt.searchKey);
+                  }
+                  setActivityFilter('all');
+                  setActiveTab(1);
+                  setToast(`Filtered ${pt.count} activities for ${pt.label}`);
+                }}
+                onMouseEnter={() => setHoveredPoint(pt)}
+                onMouseLeave={() => setHoveredPoint(null)}
+                style={{ cursor: 'pointer' }}
               >
-                {pt.label}
-              </text>
-            </g>
-          ))}
+                {/* Floating Value Pill on top of node */}
+                <rect
+                  x={pt.x - 16}
+                  y={pt.y - 25}
+                  width="32"
+                  height="18"
+                  rx="6"
+                  fill="rgba(11, 19, 21, 0.9)"
+                  stroke={pt.count > 0 ? themeColor : 'rgba(255,255,255,0.1)'}
+                  strokeWidth="1"
+                />
+                <text
+                  x={pt.x}
+                  y={pt.y - 12}
+                  fill={pt.count > 0 ? '#EBF5F3' : '#94A8A3'}
+                  fontSize="11"
+                  fontWeight="900"
+                  textAnchor="middle"
+                >
+                  {pt.count}
+                </text>
+
+                {/* Outer Glow Halo if hovered */}
+                {isHighlighted && (
+                  <circle
+                    cx={pt.x}
+                    cy={pt.y}
+                    r="12"
+                    fill="none"
+                    stroke={themeColor}
+                    strokeWidth="2"
+                    opacity="0.8"
+                  />
+                )}
+
+                {/* Main Node Circle */}
+                <circle
+                  cx={pt.x}
+                  cy={pt.y}
+                  r="6.5"
+                  fill="#0B1315"
+                  stroke={pt.count > 0 ? themeColor : '#94A8A3'}
+                  strokeWidth="3.5"
+                  style={{ transition: 'all 0.2s' }}
+                />
+
+                {/* Broad Hit Target */}
+                <circle
+                  cx={pt.x}
+                  cy={pt.y}
+                  r="20"
+                  fill="transparent"
+                />
+
+                {/* X-Axis Date/Month Label */}
+                <text
+                  x={pt.x}
+                  y={height - 12}
+                  fill={isHighlighted ? '#00C896' : '#94A8A3'}
+                  fontSize="11"
+                  fontWeight={isHighlighted ? '900' : '700'}
+                  textAnchor="middle"
+                >
+                  {pt.label}
+                </text>
+              </g>
+            );
+          })}
         </svg>
 
         {/* Hover Tooltip Card */}
         {hoveredPoint && (
           <Paper
-            elevation={6}
+            elevation={8}
             sx={{
               position: 'absolute',
               top: 15,
               right: 20,
-              p: 1.5,
-              borderRadius: '12px',
+              p: 2,
+              borderRadius: '14px',
               bgcolor: 'rgba(19, 31, 34, 0.95)',
-              border: '1px solid #00C896',
-              boxShadow: '0 8px 24px rgba(0, 200, 150, 0.3)',
-              backdropFilter: 'blur(10px)',
+              border: `1px solid ${themeColor}`,
+              boxShadow: `0 10px 30px ${themeColor}30`,
+              backdropFilter: 'blur(12px)',
               pointerEvents: 'none',
-              zIndex: 10
+              zIndex: 10,
+              minWidth: 200
             }}
           >
-            <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#00C896' }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 900, color: themeColor }}>
               {hoveredPoint.label}
             </Typography>
-            <Typography variant="body2" sx={{ color: '#EBF5F3', fontWeight: 700 }}>
+            <Typography variant="body2" sx={{ color: '#EBF5F3', fontWeight: 800, mt: 0.3 }}>
               Total Activities: {hoveredPoint.count}
             </Typography>
-            {hoveredPoint.rx !== undefined && (
-              <Typography variant="caption" sx={{ color: '#38BDF8', display: 'block' }}>
-                • Prescriptions: {hoveredPoint.rx}
+            <Divider sx={{ my: 1, borderColor: 'rgba(255,255,255,0.08)' }} />
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.4 }}>
+              <Typography variant="caption" sx={{ color: '#00C896', fontWeight: 700 }}>
+                • Prescriptions (Rx): {hoveredPoint.rx || 0}
               </Typography>
-            )}
-            {hoveredPoint.billing !== undefined && (
-              <Typography variant="caption" sx={{ color: '#818CF8', display: 'block' }}>
-                • Billing Invoices: {hoveredPoint.billing}
+              <Typography variant="caption" sx={{ color: '#38BDF8', fontWeight: 700 }}>
+                • Billing Invoices: {hoveredPoint.billing || 0}
               </Typography>
-            )}
+              <Typography variant="caption" sx={{ color: '#C084FC', fontWeight: 700 }}>
+                • Home Care Visits: {hoveredPoint.homeCare || 0}
+              </Typography>
+              <Typography variant="caption" sx={{ color: '#34D399', fontWeight: 700 }}>
+                • Security Audits: {hoveredPoint.security || 0}
+              </Typography>
+            </Box>
+            <Typography variant="caption" sx={{ color: '#00C896', fontWeight: 800, display: 'block', mt: 1 }}>
+              👉 Click point to view activities
+            </Typography>
           </Paper>
         )}
       </Box>
@@ -971,6 +1043,37 @@ export default function UserDetailModal({
                         />
                       ))}
                     </Box>
+                  </Box>
+
+                  {/* Category Filter Chips Bar */}
+                  <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap', alignItems: 'center' }}>
+                    <Typography variant="caption" sx={{ color: '#94A8A3', fontWeight: 800, mr: 0.5 }}>
+                      Plot Metric:
+                    </Typography>
+                    {[
+                      { id: 'all', label: `All Activities (${activities.length || 50})`, color: '#00C896' },
+                      { id: 'prescription', label: `Prescriptions (${activities.filter(a => a.type === 'prescription').length || categoryCounts.prescriptions || 0})`, color: '#00C896' },
+                      { id: 'billing', label: `Billing Invoices (${activities.filter(a => a.type === 'billing').length || categoryCounts.billing || 0})`, color: '#38BDF8' },
+                      { id: 'home_care', label: `Home Care (${activities.filter(a => a.type === 'home_care').length || categoryCounts.homeCare || 0})`, color: '#C084FC' },
+                      { id: 'security', label: `Security & Logins (${activities.filter(a => a.type === 'security' || a.type === 'profile').length || categoryCounts.security || 0})`, color: '#34D399' }
+                    ].map((cat) => (
+                      <Chip
+                        key={cat.id}
+                        label={cat.label}
+                        size="small"
+                        onClick={() => setGraphCategory(cat.id as any)}
+                        sx={{
+                          cursor: 'pointer',
+                          fontWeight: 800,
+                          fontSize: '0.72rem',
+                          bgcolor: graphCategory === cat.id ? `${cat.color}25` : 'rgba(255,255,255,0.04)',
+                          color: graphCategory === cat.id ? cat.color : '#94A8A3',
+                          border: graphCategory === cat.id ? `1.5px solid ${cat.color}` : '1px solid rgba(255,255,255,0.08)',
+                          transition: 'all 0.2s',
+                          '&:hover': { bgcolor: `${cat.color}35` }
+                        }}
+                      />
+                    ))}
                   </Box>
 
                   {/* SVG Chart */}
