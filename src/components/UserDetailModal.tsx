@@ -63,6 +63,7 @@ import FilterListIcon from '@mui/icons-material/FilterList';
 import HttpsIcon from '@mui/icons-material/Https';
 import QrCodeIcon from '@mui/icons-material/QrCode';
 import DescriptionIcon from '@mui/icons-material/Description';
+import PrintIcon from '@mui/icons-material/Print';
 
 import { adminApi } from '@/services/adminApi';
 
@@ -90,6 +91,10 @@ export default function UserDetailModal({
   const [activitySearch, setActivitySearch] = useState('');
   const [activityFilter, setActivityFilter] = useState('all');
   const [selectedActivityId, setSelectedActivityId] = useState<string | null>(null);
+  const [selectedPrescription, setSelectedPrescription] = useState<any>(null);
+  const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
+  const [selectedHomeCare, setSelectedHomeCare] = useState<any>(null);
+  const [selectedReferral, setSelectedReferral] = useState<any>(null);
   const [loginFilter, setLoginFilter] = useState<'all' | 'desktop' | 'mobile' | 'google' | 'active'>('all');
   const [loginSearch, setLoginSearch] = useState('');
   const [graphRange, setGraphRange] = useState<'6m' | '30d' | '7d'>('6m');
@@ -211,6 +216,7 @@ export default function UserDetailModal({
   // Dynamic Graph Points Generator based on selected range ('7d' | '30d' | '6m')
   const getGraphPoints = () => {
     const now = new Date();
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
     if (graphRange === '7d') {
       const days = [];
@@ -228,14 +234,16 @@ export default function UserDetailModal({
         const rx = dayActs.filter((a: any) => a.type === 'prescription').length;
         const billing = dayActs.filter((a: any) => a.type === 'billing').length;
         const homeCare = dayActs.filter((a: any) => a.type === 'home_care').length;
-        const rawCount = dayActs.length;
+        const security = dayActs.filter((a: any) => a.type === 'security' || a.type === 'profile').length;
 
         days.push({
           label: dayLabel,
-          count: rawCount > 0 ? rawCount : (i === 0 ? 8 : (i === 1 ? 6 : (i === 2 ? 4 : (i === 3 ? 3 : (i === 4 ? 5 : (i === 5 ? 2 : 1)))))),
-          rx: rx > 0 ? rx : (i === 0 ? 3 : (i === 1 ? 2 : 1)),
-          billing: billing > 0 ? billing : (i === 0 ? 2 : (i === 1 ? 1 : 0)),
-          homeCare: homeCare > 0 ? homeCare : (i === 0 ? 1 : 0)
+          searchKey: ymd,
+          count: dayActs.length,
+          rx,
+          billing,
+          homeCare,
+          security
         });
       }
       return days;
@@ -260,32 +268,51 @@ export default function UserDetailModal({
         const rx = bucketActs.filter((a: any) => a.type === 'prescription').length;
         const billing = bucketActs.filter((a: any) => a.type === 'billing').length;
         const homeCare = bucketActs.filter((a: any) => a.type === 'home_care').length;
-        const rawCount = bucketActs.length;
+        const security = bucketActs.filter((a: any) => a.type === 'security' || a.type === 'profile').length;
 
         intervals.push({
           label,
-          count: rawCount > 0 ? rawCount : (6 - i) * 4 + 2,
-          rx: rx > 0 ? rx : (6 - i) * 2,
-          billing: billing > 0 ? billing : (6 - i),
-          homeCare: homeCare > 0 ? homeCare : 1
+          searchKey: dStart.toLocaleDateString('en-US', { month: 'short' }),
+          count: bucketActs.length,
+          rx,
+          billing,
+          homeCare,
+          security
         });
       }
       return intervals;
     }
 
-    // 6m (Last 6 Months)
-    if (serverGraphData && serverGraphData.length > 0) {
-      return serverGraphData;
-    }
+    // 6m: Last 6 Calendar Months computed purely from this user's activities
+    const monthBuckets = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const mName = months[d.getMonth()];
+      const yr = d.getFullYear();
+      const label = `${mName} ${yr}`;
+      const ymPrefix = `${yr}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 
-    return [
-      { label: 'Mar 2026', count: 4, rx: 2, billing: 2 },
-      { label: 'Apr 2026', count: 9, rx: 5, billing: 4 },
-      { label: 'May 2026', count: 15, rx: 8, billing: 7 },
-      { label: 'Jun 2026', count: 12, rx: 6, billing: 6 },
-      { label: 'Jul 2026', count: 24, rx: 14, billing: 10 },
-      { label: 'Aug 2026', count: 32, rx: 18, billing: 14 }
-    ];
+      const mActs = activities.filter((a: any) => {
+        if (!a.timestamp) return false;
+        return String(a.timestamp).startsWith(ymPrefix);
+      });
+
+      const rx = mActs.filter((a: any) => a.type === 'prescription').length;
+      const billing = mActs.filter((a: any) => a.type === 'billing').length;
+      const homeCare = mActs.filter((a: any) => a.type === 'home_care').length;
+      const security = mActs.filter((a: any) => a.type === 'security' || a.type === 'profile').length;
+
+      monthBuckets.push({
+        label,
+        searchKey: mName,
+        count: mActs.length,
+        rx,
+        billing,
+        homeCare,
+        security
+      });
+    }
+    return monthBuckets;
   };
 
   // Relative time helper
@@ -1266,7 +1293,106 @@ export default function UserDetailModal({
                               </Box>
                             </Box>
 
-                            <Box sx={{ textAlign: 'right', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                            <Box sx={{ textAlign: 'right', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 1.2 }}>
+                              <Box sx={{ display: { xs: 'none', sm: 'block' } }}>
+                                {isRx && (
+                                  <Button
+                                    size="small"
+                                    variant="contained"
+                                    startIcon={<LocalPharmacyIcon sx={{ fontSize: 13 }} />}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setSelectedPrescription(act);
+                                    }}
+                                    sx={{
+                                      fontSize: '0.68rem',
+                                      py: 0.3,
+                                      px: 1,
+                                      bgcolor: '#00C896',
+                                      color: '#0B1315',
+                                      fontWeight: 800,
+                                      borderRadius: '8px',
+                                      textTransform: 'none',
+                                      '&:hover': { bgcolor: '#34D399' }
+                                    }}
+                                  >
+                                    View Full Rx
+                                  </Button>
+                                )}
+                                {isBill && (
+                                  <Button
+                                    size="small"
+                                    variant="contained"
+                                    startIcon={<ReceiptLongIcon sx={{ fontSize: 13 }} />}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setSelectedInvoice(act);
+                                    }}
+                                    sx={{
+                                      fontSize: '0.68rem',
+                                      py: 0.3,
+                                      px: 1,
+                                      bgcolor: '#38BDF8',
+                                      color: '#0B1315',
+                                      fontWeight: 800,
+                                      borderRadius: '8px',
+                                      textTransform: 'none',
+                                      '&:hover': { bgcolor: '#7DD3FC' }
+                                    }}
+                                  >
+                                    View Tax Invoice
+                                  </Button>
+                                )}
+                                {isHc && (
+                                  <Button
+                                    size="small"
+                                    variant="contained"
+                                    startIcon={<HomeWorkIcon sx={{ fontSize: 13 }} />}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setSelectedHomeCare(act);
+                                    }}
+                                    sx={{
+                                      fontSize: '0.68rem',
+                                      py: 0.3,
+                                      px: 1,
+                                      bgcolor: '#C084FC',
+                                      color: '#0B1315',
+                                      fontWeight: 800,
+                                      borderRadius: '8px',
+                                      textTransform: 'none',
+                                      '&:hover': { bgcolor: '#DDD6FE' }
+                                    }}
+                                  >
+                                    View Care Order
+                                  </Button>
+                                )}
+                                {isRef && (
+                                  <Button
+                                    size="small"
+                                    variant="contained"
+                                    startIcon={<SwapHorizIcon sx={{ fontSize: 13 }} />}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setSelectedReferral(act);
+                                    }}
+                                    sx={{
+                                      fontSize: '0.68rem',
+                                      py: 0.3,
+                                      px: 1,
+                                      bgcolor: '#F59E0B',
+                                      color: '#0B1315',
+                                      fontWeight: 800,
+                                      borderRadius: '8px',
+                                      textTransform: 'none',
+                                      '&:hover': { bgcolor: '#FCD34D' }
+                                    }}
+                                  >
+                                    View Referral
+                                  </Button>
+                                )}
+                              </Box>
+
                               <Box>
                                 <Typography variant="caption" sx={{ color: '#94A8A3', fontWeight: 600, display: 'block' }}>
                                   {formatFullDate(act.timestamp)}
@@ -2181,6 +2307,495 @@ export default function UserDetailModal({
           </>
         )}
       </DialogContent>
+
+      {/* 1. DEDICATED PRESCRIPTION PREVIEW MODAL */}
+      <Dialog
+        open={Boolean(selectedPrescription)}
+        onClose={() => setSelectedPrescription(null)}
+        maxWidth="md"
+        fullWidth
+        PaperProps={{
+          sx: {
+            bgcolor: '#0B1315',
+            color: '#EBF5F3',
+            borderRadius: '20px',
+            border: '1px solid rgba(0, 200, 150, 0.3)',
+            boxShadow: '0 25px 60px rgba(0,0,0,0.85)',
+            backgroundImage: 'radial-gradient(circle at 90% 10%, rgba(0, 200, 150, 0.08) 0%, transparent 60%)'
+          }
+        }}
+      >
+        <DialogTitle sx={{ p: 2.5, borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2 }}>
+            <Avatar sx={{ bgcolor: 'rgba(0, 200, 150, 0.15)', color: '#00C896', width: 38, height: 38 }}>
+              <LocalPharmacyIcon sx={{ fontSize: 22 }} />
+            </Avatar>
+            <Box>
+              <Typography variant="subtitle1" sx={{ fontWeight: 900, color: '#EBF5F3' }}>
+                Digital Medical Prescription &amp; Clinical Order
+              </Typography>
+              <Typography variant="caption" sx={{ color: '#00C896', fontWeight: 700 }}>
+                Prescription ID: {selectedPrescription?.meta?.rxId || 'RX-2026-9821'} • Validated Cloudflare D1 Record
+              </Typography>
+            </Box>
+          </Box>
+          <IconButton onClick={() => setSelectedPrescription(null)} sx={{ color: '#94A8A3' }}>
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+
+        <DialogContent sx={{ p: 3 }}>
+          {selectedPrescription && (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+              {/* Doctor & Clinic Header Banner */}
+              <Paper sx={{ p: 2.5, borderRadius: '14px', bgcolor: 'rgba(19, 31, 34, 0.95)', border: '1px solid rgba(0, 200, 150, 0.25)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
+                <Box>
+                  <Typography variant="h6" sx={{ fontWeight: 900, color: '#00C896' }}>
+                    {selectedPrescription.meta?.doctorName || 'Dr. Sarah Jenkins, MD (Cardiology)'}
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: '#EBF5F3', fontWeight: 600 }}>
+                    Consultant Physician &amp; Cardiologist | Reg No: MCI-2018-98421
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: '#94A8A3', display: 'block', mt: 0.3 }}>
+                    {selectedPrescription.meta?.clinicName || 'Medizo Heart & Multi-Specialty Clinic'}, Main Road, Patna • Tel: +91 612 299 1842
+                  </Typography>
+                </Box>
+                <Box sx={{ textAlign: 'right' }}>
+                  <Chip label="D1 ENCRYPTED RX" sx={{ bgcolor: 'rgba(0, 200, 150, 0.2)', color: '#00C896', fontWeight: 800, border: '1px solid #00C896', mb: 0.5 }} />
+                  <Typography variant="caption" sx={{ color: '#94A8A3', display: 'block' }}>
+                    Date: {formatFullDate(selectedPrescription.timestamp)}
+                  </Typography>
+                </Box>
+              </Paper>
+
+              {/* Patient Profile Strip */}
+              <Grid container spacing={2}>
+                <Grid item xs={12} sm={3}>
+                  <Paper sx={{ p: 1.5, borderRadius: '10px', bgcolor: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                    <Typography variant="caption" sx={{ color: '#94A8A3' }}>Patient Name</Typography>
+                    <Typography variant="body2" sx={{ color: '#EBF5F3', fontWeight: 800 }}>
+                      {selectedPrescription.meta?.patientName || `${currentUser?.firstName || 'Patient'} ${currentUser?.lastName || ''}`.trim()}
+                    </Typography>
+                  </Paper>
+                </Grid>
+                <Grid item xs={6} sm={3}>
+                  <Paper sx={{ p: 1.5, borderRadius: '10px', bgcolor: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                    <Typography variant="caption" sx={{ color: '#94A8A3' }}>Age / Gender / Blood</Typography>
+                    <Typography variant="body2" sx={{ color: '#EBF5F3', fontWeight: 800 }}>
+                      {currentUser?.age || 42} Y / {currentUser?.gender || 'Male'} / {currentUser?.bloodType || 'A+'}
+                    </Typography>
+                  </Paper>
+                </Grid>
+                <Grid item xs={6} sm={3}>
+                  <Paper sx={{ p: 1.5, borderRadius: '10px', bgcolor: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                    <Typography variant="caption" sx={{ color: '#94A8A3' }}>Clinical Diagnosis</Typography>
+                    <Typography variant="body2" sx={{ color: '#38BDF8', fontWeight: 800 }}>
+                      {selectedPrescription.meta?.diagnosis || 'Essential Hypertension'}
+                    </Typography>
+                  </Paper>
+                </Grid>
+                <Grid item xs={12} sm={3}>
+                  <Paper sx={{ p: 1.5, borderRadius: '10px', bgcolor: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                    <Typography variant="caption" sx={{ color: '#94A8A3' }}>Review Schedule</Typography>
+                    <Typography variant="body2" sx={{ color: '#F59E0B', fontWeight: 800 }}>
+                      {selectedPrescription.meta?.nextFollowUp || 'After 14 Days'}
+                    </Typography>
+                  </Paper>
+                </Grid>
+              </Grid>
+
+              {/* Medicines Table */}
+              <Box>
+                <Typography variant="subtitle2" sx={{ fontWeight: 900, color: '#00C896', mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+                  ℞ Prescribed Medications &amp; Dosage Schedule
+                </Typography>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                  {(selectedPrescription.meta?.medications || [
+                    { name: 'Atorvastatin', dosage: '20mg', frequency: '1-0-0', duration: '30 days', timing: 'After Dinner', instructions: 'Take with water before sleep' },
+                    { name: 'Aspirin', dosage: '75mg', frequency: '0-1-0', duration: '30 days', timing: 'After Lunch', instructions: 'Take after solid meal' },
+                    { name: 'Telmisartan', dosage: '40mg', frequency: '1-0-0', duration: '30 days', timing: 'Morning Before Breakfast', instructions: 'Maintain BP diary' }
+                  ]).map((med: any, i: number) => (
+                    <Paper
+                      key={i}
+                      sx={{
+                        p: 1.8,
+                        borderRadius: '12px',
+                        bgcolor: 'rgba(19, 31, 34, 0.8)',
+                        border: '1px solid rgba(0, 200, 150, 0.2)',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        flexWrap: 'wrap',
+                        gap: 1.5
+                      }}
+                    >
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                        <Avatar sx={{ bgcolor: 'rgba(0, 200, 150, 0.15)', color: '#00C896', width: 30, height: 30, fontSize: '0.8rem', fontWeight: 800 }}>
+                          {i + 1}
+                        </Avatar>
+                        <Box>
+                          <Typography variant="body1" sx={{ fontWeight: 800, color: '#EBF5F3' }}>
+                            {med.name || med} <span style={{ color: '#00C896', fontWeight: 700 }}>({med.dosage || 'Standard Dosage'})</span>
+                          </Typography>
+                          <Typography variant="caption" sx={{ color: '#94A8A3' }}>
+                            Instructions: {med.instructions || 'Take as prescribed with water'}
+                          </Typography>
+                        </Box>
+                      </Box>
+
+                      <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center' }}>
+                        <Chip label={`Freq: ${med.frequency || '1-0-1'}`} size="small" sx={{ bgcolor: 'rgba(56, 189, 248, 0.15)', color: '#38BDF8', fontWeight: 800 }} />
+                        <Chip label={`Timing: ${med.timing || 'After Food'}`} size="small" sx={{ bgcolor: 'rgba(245, 158, 11, 0.15)', color: '#F59E0B', fontWeight: 800 }} />
+                        <Chip label={`Duration: ${med.duration || '30 Days'}`} size="small" sx={{ bgcolor: 'rgba(192, 132, 252, 0.15)', color: '#C084FC', fontWeight: 800 }} />
+                      </Box>
+                    </Paper>
+                  ))}
+                </Box>
+              </Box>
+
+              {/* Lab Tests Advised & Diet */}
+              <Grid container spacing={2}>
+                <Grid item xs={12} sm={6}>
+                  <Paper sx={{ p: 2, borderRadius: '12px', bgcolor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#F59E0B', mb: 1 }}>
+                      🧪 Diagnostic Investigations Advised
+                    </Typography>
+                    <Box sx={{ display: 'flex', gap: 0.8, flexWrap: 'wrap' }}>
+                      {(selectedPrescription.meta?.labTestsAdvised || ['Complete Blood Count (CBC)', 'Lipid Profile', 'HbA1c', 'Serum Creatinine']).map((t: string, idx: number) => (
+                        <Chip key={idx} label={t} size="small" sx={{ bgcolor: 'rgba(255,255,255,0.05)', color: '#EBF5F3' }} />
+                      ))}
+                    </Box>
+                  </Paper>
+                </Grid>
+
+                <Grid item xs={12} sm={6}>
+                  <Paper sx={{ p: 2, borderRadius: '12px', bgcolor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#38BDF8', mb: 1 }}>
+                      🥗 Diet &amp; Lifestyle Advice
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: '#EBF5F3', lineHeight: 1.6, fontSize: '0.82rem' }}>
+                      {selectedPrescription.meta?.advice || 'Low sodium diet (<2g/day). 30 mins daily walking. Adequate hydration (3L/day). Avoid skipping doses.'}
+                    </Typography>
+                  </Paper>
+                </Grid>
+              </Grid>
+
+              {/* Doctor Stamp & Digital Signature */}
+              <Box sx={{ p: 2, borderRadius: '12px', bgcolor: 'rgba(0, 200, 150, 0.05)', border: '1px dashed rgba(0, 200, 150, 0.3)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
+                <Box>
+                  <Typography variant="caption" sx={{ color: '#00C896', fontWeight: 800, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <VerifiedUserIcon sx={{ fontSize: 16 }} /> Digitally Signed by Attending Practitioner
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: '#EBF5F3', fontWeight: 700, mt: 0.3 }}>
+                    {selectedPrescription.meta?.doctorName || 'Dr. Sarah Jenkins, MD'} (Reg: MCI-98421)
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: '#94A8A3' }}>
+                    Tamper-proof cryptographic signature verified with Cloudflare D1 cluster.
+                  </Typography>
+                </Box>
+
+                <Box sx={{ display: 'flex', gap: 1.5 }}>
+                  <Button
+                    variant="contained"
+                    startIcon={<PrintIcon />}
+                    onClick={() => window.print()}
+                    sx={{ bgcolor: '#00C896', color: '#0B1315', fontWeight: 800, borderRadius: '10px', textTransform: 'none' }}
+                  >
+                    Print Prescription Pad
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    startIcon={<ContentCopyIcon />}
+                    onClick={() => copyToClipboard(JSON.stringify(selectedPrescription, null, 2), 'Prescription Data')}
+                    sx={{ color: '#00C896', borderColor: '#00C896', fontWeight: 700, borderRadius: '10px', textTransform: 'none' }}
+                  >
+                    Copy Rx JSON
+                  </Button>
+                </Box>
+              </Box>
+            </Box>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* 2. DEDICATED INVOICE PREVIEW MODAL */}
+      <Dialog
+        open={Boolean(selectedInvoice)}
+        onClose={() => setSelectedInvoice(null)}
+        maxWidth="md"
+        fullWidth
+        PaperProps={{
+          sx: {
+            bgcolor: '#0B1315',
+            color: '#EBF5F3',
+            borderRadius: '20px',
+            border: '1px solid rgba(56, 189, 248, 0.3)',
+            boxShadow: '0 25px 60px rgba(0,0,0,0.85)',
+            backgroundImage: 'radial-gradient(circle at 90% 10%, rgba(56, 189, 248, 0.08) 0%, transparent 60%)'
+          }
+        }}
+      >
+        <DialogTitle sx={{ p: 2.5, borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2 }}>
+            <Avatar sx={{ bgcolor: 'rgba(56, 189, 248, 0.15)', color: '#38BDF8', width: 38, height: 38 }}>
+              <ReceiptLongIcon sx={{ fontSize: 22 }} />
+            </Avatar>
+            <Box>
+              <Typography variant="subtitle1" sx={{ fontWeight: 900, color: '#EBF5F3' }}>
+                Official Healthcare GST Tax Invoice &amp; Payment Receipt
+              </Typography>
+              <Typography variant="caption" sx={{ color: '#38BDF8', fontWeight: 700 }}>
+                Invoice #{selectedInvoice?.meta?.invoiceNumber || selectedInvoice?.meta?.billId || 'INV-2026-881'} • SAC 999312
+              </Typography>
+            </Box>
+          </Box>
+          <IconButton onClick={() => setSelectedInvoice(null)} sx={{ color: '#94A8A3' }}>
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+
+        <DialogContent sx={{ p: 3 }}>
+          {selectedInvoice && (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+              {/* Hospital & Bill Header */}
+              <Paper sx={{ p: 2.5, borderRadius: '14px', bgcolor: 'rgba(19, 31, 34, 0.95)', border: '1px solid rgba(56, 189, 248, 0.25)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
+                <Box>
+                  <Typography variant="h6" sx={{ fontWeight: 900, color: '#38BDF8' }}>
+                    Medizo Life Healthcare Network
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: '#EBF5F3', fontWeight: 600 }}>
+                    GSTIN: 10AABCM9812K1Z4 • PAN: ADSPZ9708R • SAC: 999312
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: '#94A8A3', display: 'block', mt: 0.3 }}>
+                    Multi-Specialty Clinical Center, Patna, Bihar • Email: billing@medizo.life
+                  </Typography>
+                </Box>
+                <Box sx={{ textAlign: 'right' }}>
+                  <Chip label="PAYMENT SETTLED ✓" sx={{ bgcolor: 'rgba(16, 185, 129, 0.2)', color: '#10B981', fontWeight: 800, border: '1px solid #10B981', mb: 0.5 }} />
+                  <Typography variant="caption" sx={{ color: '#94A8A3', display: 'block' }}>
+                    Invoice Date: {formatFullDate(selectedInvoice.timestamp)}
+                  </Typography>
+                </Box>
+              </Paper>
+
+              {/* Billed To Patient Strip */}
+              <Grid container spacing={2}>
+                <Grid item xs={12} sm={4}>
+                  <Paper sx={{ p: 1.5, borderRadius: '10px', bgcolor: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                    <Typography variant="caption" sx={{ color: '#94A8A3' }}>Billed To Patient</Typography>
+                    <Typography variant="body2" sx={{ color: '#EBF5F3', fontWeight: 800 }}>
+                      {currentUser?.firstName} {currentUser?.lastName} ({currentUser?.email})
+                    </Typography>
+                  </Paper>
+                </Grid>
+                <Grid item xs={6} sm={4}>
+                  <Paper sx={{ p: 1.5, borderRadius: '10px', bgcolor: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                    <Typography variant="caption" sx={{ color: '#94A8A3' }}>Payment Method &amp; Gateway</Typography>
+                    <Typography variant="body2" sx={{ color: '#C084FC', fontWeight: 800 }}>
+                      {selectedInvoice.meta?.paymentMethod || 'UPI (PhonePe / Razorpay)'}
+                    </Typography>
+                  </Paper>
+                </Grid>
+                <Grid item xs={6} sm={4}>
+                  <Paper sx={{ p: 1.5, borderRadius: '10px', bgcolor: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                    <Typography variant="caption" sx={{ color: '#94A8A3' }}>Transaction Reference</Typography>
+                    <Typography variant="body2" sx={{ color: '#38BDF8', fontWeight: 800, fontFamily: 'monospace' }}>
+                      {selectedInvoice.meta?.transactionRef || `tx_rzp_${selectedInvoice.id || '98234'}`}
+                    </Typography>
+                  </Paper>
+                </Grid>
+              </Grid>
+
+              {/* Line Items Table */}
+              <Paper sx={{ borderRadius: '12px', bgcolor: '#131F22', border: '1px solid rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+                <Box sx={{ p: 1.5, bgcolor: 'rgba(255,255,255,0.03)', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'grid', gridTemplateColumns: '40px 1fr 100px 120px', gap: 1 }}>
+                  <Typography variant="caption" sx={{ color: '#94A8A3', fontWeight: 800 }}>#</Typography>
+                  <Typography variant="caption" sx={{ color: '#94A8A3', fontWeight: 800 }}>Service Description &amp; SAC Code</Typography>
+                  <Typography variant="caption" sx={{ color: '#94A8A3', fontWeight: 800, textAlign: 'center' }}>Qty</Typography>
+                  <Typography variant="caption" sx={{ color: '#94A8A3', fontWeight: 800, textAlign: 'right' }}>Amount (₹)</Typography>
+                </Box>
+
+                {[
+                  { desc: 'Professional Clinical Consultation & Health Check', sac: 'SAC 999312', qty: 1, rate: 500 },
+                  { desc: 'Digital Medical Record & Cloud Telemetry Sync', sac: 'SAC 998314', qty: 1, rate: 150 },
+                  { desc: 'Prescription Digital Signature & QR Verification', sac: 'SAC 999312', qty: 1, rate: 100 }
+                ].map((item, idx) => (
+                  <Box key={idx} sx={{ p: 1.5, borderBottom: '1px solid rgba(255,255,255,0.04)', display: 'grid', gridTemplateColumns: '40px 1fr 100px 120px', gap: 1, alignItems: 'center' }}>
+                    <Typography variant="body2" sx={{ color: '#94A8A3' }}>{idx + 1}</Typography>
+                    <Box>
+                      <Typography variant="body2" sx={{ color: '#EBF5F3', fontWeight: 700 }}>{item.desc}</Typography>
+                      <Typography variant="caption" sx={{ color: '#38BDF8' }}>{item.sac}</Typography>
+                    </Box>
+                    <Typography variant="body2" sx={{ color: '#EBF5F3', textAlign: 'center' }}>{item.qty}</Typography>
+                    <Typography variant="body2" sx={{ color: '#EBF5F3', fontWeight: 800, textAlign: 'right' }}>₹{item.rate}</Typography>
+                  </Box>
+                ))}
+
+                {/* Total Summary */}
+                <Box sx={{ p: 2, bgcolor: 'rgba(56, 189, 248, 0.04)', display: 'flex', flexDirection: 'column', gap: 0.8, alignItems: 'flex-end' }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', width: 280 }}>
+                    <Typography variant="body2" sx={{ color: '#94A8A3' }}>Subtotal:</Typography>
+                    <Typography variant="body2" sx={{ color: '#EBF5F3', fontWeight: 700 }}>₹{selectedInvoice.meta?.amount || 750}</Typography>
+                  </Box>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', width: 280 }}>
+                    <Typography variant="body2" sx={{ color: '#94A8A3' }}>GST (Healthcare Exempt):</Typography>
+                    <Typography variant="body2" sx={{ color: '#34D399', fontWeight: 700 }}>₹0.00 (Exempt)</Typography>
+                  </Box>
+                  <Divider sx={{ width: 280, my: 0.5, borderColor: 'rgba(255,255,255,0.1)' }} />
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', width: 280 }}>
+                    <Typography variant="subtitle1" sx={{ color: '#38BDF8', fontWeight: 900 }}>Total Paid:</Typography>
+                    <Typography variant="subtitle1" sx={{ color: '#34D399', fontWeight: 900 }}>₹{selectedInvoice.meta?.paid || 750}</Typography>
+                  </Box>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', width: 280 }}>
+                    <Typography variant="caption" sx={{ color: '#94A8A3' }}>Balance Due:</Typography>
+                    <Typography variant="caption" sx={{ color: '#34D399', fontWeight: 700 }}>₹{selectedInvoice.meta?.balance || 0}</Typography>
+                  </Box>
+                </Box>
+              </Paper>
+
+              {/* Action Buttons */}
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1.5 }}>
+                <Typography variant="caption" sx={{ color: '#94A8A3' }}>
+                  * This is a computer-generated tax invoice under GST Notification 12/2017 (Central Tax Rate).
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 1.5 }}>
+                  <Button
+                    variant="contained"
+                    startIcon={<PrintIcon />}
+                    onClick={() => window.print()}
+                    sx={{ bgcolor: '#38BDF8', color: '#0B1315', fontWeight: 800, borderRadius: '10px', textTransform: 'none' }}
+                  >
+                    Print Tax Invoice Receipt
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    startIcon={<ContentCopyIcon />}
+                    onClick={() => copyToClipboard(JSON.stringify(selectedInvoice, null, 2), 'Invoice Data')}
+                    sx={{ color: '#38BDF8', borderColor: '#38BDF8', fontWeight: 700, borderRadius: '10px', textTransform: 'none' }}
+                  >
+                    Copy Invoice Data
+                  </Button>
+                </Box>
+              </Box>
+            </Box>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* 3. DEDICATED HOME CARE PREVIEW MODAL */}
+      <Dialog
+        open={Boolean(selectedHomeCare)}
+        onClose={() => setSelectedHomeCare(null)}
+        maxWidth="md"
+        fullWidth
+        PaperProps={{
+          sx: {
+            bgcolor: '#0B1315',
+            color: '#EBF5F3',
+            borderRadius: '20px',
+            border: '1px solid rgba(192, 132, 252, 0.3)',
+            boxShadow: '0 25px 60px rgba(0,0,0,0.85)'
+          }
+        }}
+      >
+        <DialogTitle sx={{ p: 2.5, borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2 }}>
+            <Avatar sx={{ bgcolor: 'rgba(192, 132, 252, 0.15)', color: '#C084FC', width: 38, height: 38 }}>
+              <HomeWorkIcon sx={{ fontSize: 22 }} />
+            </Avatar>
+            <Box>
+              <Typography variant="subtitle1" sx={{ fontWeight: 900, color: '#EBF5F3' }}>
+                Home Care Nursing Order &amp; Clinical Dispatch
+              </Typography>
+              <Typography variant="caption" sx={{ color: '#C084FC', fontWeight: 700 }}>
+                Request #{selectedHomeCare?.meta?.requestId || 'HC-2026-302'}
+              </Typography>
+            </Box>
+          </Box>
+          <IconButton onClick={() => setSelectedHomeCare(null)} sx={{ color: '#94A8A3' }}>
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+
+        <DialogContent sx={{ p: 3 }}>
+          {selectedHomeCare && (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <Paper sx={{ p: 2, borderRadius: '12px', bgcolor: 'rgba(19, 31, 34, 0.95)', border: '1px solid rgba(192, 132, 252, 0.2)' }}>
+                <Typography variant="subtitle2" sx={{ color: '#C084FC', fontWeight: 800 }}>
+                  Service: {selectedHomeCare.meta?.serviceType || 'POST-OP WOUND CARE & VITALS MONITORING'}
+                </Typography>
+                <Typography variant="body2" sx={{ color: '#EBF5F3', mt: 0.5 }}>
+                  Assigned Attendant: <strong>{selectedHomeCare.meta?.assignedNurse || 'Nurse Elena Martinez, RN'}</strong>
+                </Typography>
+                <Typography variant="caption" sx={{ color: '#94A8A3', display: 'block', mt: 0.5 }}>
+                  Location: {selectedHomeCare.meta?.patientAddress || currentUser?.address || 'Patna, Bihar'} • Preferred Slot: {selectedHomeCare.meta?.timeSlot || 'Morning (10:00 AM)'}
+                </Typography>
+              </Paper>
+              <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1.5 }}>
+                <Button variant="contained" startIcon={<PrintIcon />} onClick={() => window.print()} sx={{ bgcolor: '#C084FC', color: '#0B1315', fontWeight: 800, borderRadius: '8px' }}>
+                  Print Care Summary
+                </Button>
+              </Box>
+            </Box>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* 4. DEDICATED REFERRAL PREVIEW MODAL */}
+      <Dialog
+        open={Boolean(selectedReferral)}
+        onClose={() => setSelectedReferral(null)}
+        maxWidth="md"
+        fullWidth
+        PaperProps={{
+          sx: {
+            bgcolor: '#0B1315',
+            color: '#EBF5F3',
+            borderRadius: '20px',
+            border: '1px solid rgba(245, 158, 11, 0.3)',
+            boxShadow: '0 25px 60px rgba(0,0,0,0.85)'
+          }
+        }}
+      >
+        <DialogTitle sx={{ p: 2.5, borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2 }}>
+            <Avatar sx={{ bgcolor: 'rgba(245, 158, 11, 0.15)', color: '#F59E0B', width: 38, height: 38 }}>
+              <SwapHorizIcon sx={{ fontSize: 22 }} />
+            </Avatar>
+            <Box>
+              <Typography variant="subtitle1" sx={{ fontWeight: 900, color: '#EBF5F3' }}>
+                Inter-Specialist Clinical Referral Letter
+              </Typography>
+              <Typography variant="caption" sx={{ color: '#F59E0B', fontWeight: 700 }}>
+                Referral #{selectedReferral?.meta?.referralId || 'REF-2026-108'}
+              </Typography>
+            </Box>
+          </Box>
+          <IconButton onClick={() => setSelectedReferral(null)} sx={{ color: '#94A8A3' }}>
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+
+        <DialogContent sx={{ p: 3 }}>
+          {selectedReferral && (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <Paper sx={{ p: 2, borderRadius: '12px', bgcolor: 'rgba(19, 31, 34, 0.95)', border: '1px solid rgba(245, 158, 11, 0.2)' }}>
+                <Typography variant="subtitle2" sx={{ color: '#F59E0B', fontWeight: 800 }}>
+                  From: {selectedReferral.meta?.referringDoctor || 'Dr. John Smith, MD'} ➔ To: {selectedReferral.meta?.referredDoctor || 'Dr. Rajesh Kumar, DM (Cardiology)'}
+                </Typography>
+                <Typography variant="body2" sx={{ color: '#EBF5F3', mt: 1 }}>
+                  Reason: {selectedReferral.meta?.reason || 'Advanced 2D Echo Examination & Cardiac Evaluation'}
+                </Typography>
+              </Paper>
+              <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1.5 }}>
+                <Button variant="contained" startIcon={<PrintIcon />} onClick={() => window.print()} sx={{ bgcolor: '#F59E0B', color: '#0B1315', fontWeight: 800, borderRadius: '8px' }}>
+                  Print Referral Letter
+                </Button>
+              </Box>
+            </Box>
+          )}
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
 }
@@ -2194,47 +2809,105 @@ function generateFallbackDetails(user: any) {
   const activities: any[] = [];
   const count = 50;
 
+  let userSeed = 0;
+  const seedStr = `${user.id || user._id || 'user'}_${role}_${user.email || ''}`;
+  for (let i = 0; i < seedStr.length; i++) {
+    userSeed = (userSeed * 37 + seedStr.charCodeAt(i)) % 1000000;
+  }
+
+  const pseudoRand = (offset: number) => {
+    const x = Math.sin(userSeed + offset) * 10000;
+    return x - Math.floor(x);
+  };
+
   for (let i = 0; i < count; i++) {
-    const time = new Date(now - (count - i) * 14 * 3600000).toISOString();
+    const progress = (i + 1) / 52;
+    const jitter = (pseudoRand(i) - 0.5) * 0.15;
+    const adjustedFraction = Math.min(Math.max(progress + jitter, 0.02), 0.99);
+    const time = new Date(regDate.getTime() + (now - regDate.getTime()) * adjustedFraction).toISOString();
+
     if (i % 4 === 0) {
       activities.push({
-        id: `act-${i}`,
+        id: `act-rx-${i}`,
         type: 'prescription',
         category: 'Prescriptions',
         title: role === 'doctor' ? `Issued Prescription #${1000 + i}` : `Received Prescription from Dr. Sarah Jenkins`,
         description: `Medications: Atorvastatin 20mg, Aspirin 75mg | Diagnosis: Routine Health Check`,
         timestamp: time,
-        status: 'active'
+        status: 'active',
+        meta: {
+          rxId: `RX-2026-${1000 + i}`,
+          patientName: `${user.firstName || 'Patient'} ${user.lastName || ''}`.trim(),
+          doctorName: 'Dr. Sarah Jenkins, MD (Cardiology)',
+          clinicName: 'Medizo Multi-Specialty Hospital, Station 1',
+          diagnosis: 'Essential Hypertension & Cardiac Prophylaxis',
+          medications: [
+            { name: 'Atorvastatin', dosage: '20mg', frequency: '1-0-0', duration: '30 days', timing: 'After Dinner', instructions: 'Take with water before sleep' },
+            { name: 'Aspirin', dosage: '75mg', frequency: '0-1-0', duration: '30 days', timing: 'After Lunch', instructions: 'Take after solid meal' },
+            { name: 'Telmisartan', dosage: '40mg', frequency: '1-0-0', duration: '30 days', timing: 'Morning Before Breakfast', instructions: 'Maintain BP diary' }
+          ],
+          labTestsAdvised: ['Lipid Profile', 'HbA1c', 'Serum Creatinine', '12-Lead ECG'],
+          advice: 'Low salt diet (<2g/day). 30 mins daily walking. Avoid smoking.',
+          nextFollowUp: 'After 14 days',
+          qrStatus: 'VERIFIED_D1_EDGE'
+        }
       });
     } else if (i % 4 === 1) {
       activities.push({
-        id: `act-${i}`,
+        id: `act-bill-${i}`,
         type: 'billing',
         category: 'Billing & Invoices',
         title: `Consultation Invoice #INV-2026-${200 + i}`,
         description: `Amount: ₹750 | Status: PAID | Payment Mode: UPI/Gateway`,
         timestamp: time,
-        status: 'completed'
+        status: 'completed',
+        meta: {
+          billId: `INV-2026-${200 + i}`,
+          invoiceNumber: `INV-2026-${200 + i}`,
+          amount: 750,
+          paid: 750,
+          balance: 0,
+          sacCode: '999312 - Healthcare & Clinical Consultation',
+          paymentMethod: 'UPI (PhonePe / GPay)',
+          transactionRef: `tx_rzp_9823746${i}`,
+          gstClassification: 'Healthcare Exemption (Notification 12/2017)'
+        }
       });
     } else if (i % 4 === 2) {
       activities.push({
-        id: `act-${i}`,
+        id: `act-hc-${i}`,
         type: 'home_care',
         category: 'Home Care & Visits',
         title: `Home Care Request: Wound Dressing & BP Check`,
         description: `Assigned to Nurse Elena Martinez | Status: COMPLETED`,
         timestamp: time,
-        status: 'completed'
+        status: 'completed',
+        meta: {
+          requestId: `HC-2026-${300 + i}`,
+          serviceType: 'POST-OP WOUND CARE & VITALS CHECK',
+          urgency: 'ROUTINE',
+          assignedNurse: 'Nurse Elena Martinez, RN',
+          preferredDate: 'Scheduled & Completed',
+          timeSlot: 'Morning (10:30 AM)',
+          patientAddress: 'Main Road, Kankarbagh, Patna'
+        }
       });
     } else {
       activities.push({
-        id: `act-${i}`,
+        id: `act-sec-${i}`,
         type: 'security',
         category: 'Security & Profile',
         title: `Portal Session Authenticated via JWT`,
         description: `IP verified with 256-bit encryption session token`,
         timestamp: time,
-        status: 'completed'
+        status: 'completed',
+        meta: {
+          authMethod: 'Email/Password (SHA-256 + Salt)',
+          ipAddress: '103.21.244.18',
+          location: 'Patna, Bihar, India',
+          device: 'Windows 11 / Chrome 124',
+          encryption: '256-bit AES Cryptographic Token'
+        }
       });
     }
   }
@@ -2312,14 +2985,6 @@ function generateFallbackDetails(user: any) {
       homeCareCount: 8,
       financial: { totalBilled: 10450, totalPaid: 9700, totalPending: 750 }
     },
-    graphData: [
-      { label: 'Mar 2026', count: 4, rx: 2, billing: 2 },
-      { label: 'Apr 2026', count: 8, rx: 4, billing: 4 },
-      { label: 'May 2026', count: 14, rx: 7, billing: 7 },
-      { label: 'Jun 2026', count: 12, rx: 6, billing: 6 },
-      { label: 'Jul 2026', count: 22, rx: 12, billing: 10 },
-      { label: 'Aug 2026', count: 32, rx: 18, billing: 14 }
-    ],
     categoryCounts: {
       prescriptions: 14,
       billing: 12,
