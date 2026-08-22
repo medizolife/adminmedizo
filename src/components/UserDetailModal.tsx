@@ -80,6 +80,7 @@ import Diversity1Icon from '@mui/icons-material/Diversity1';
 
 import { adminApi } from '@/services/adminApi';
 import { useAdminData } from '@/context/AdminDataContext';
+import { useAppTheme } from '@/context/ThemeContext';
 
 // Safe string formatters to prevent React object rendering exceptions
 const formatFrequency = (freq: any): string => {
@@ -146,6 +147,7 @@ export default function UserDetailModal({
   onUserUpdated
 }: UserDetailModalProps) {
   const { userDetailsCache, getUserDetailsFast, toggleUserStatusLocal, deleteUserLocal } = useAdminData();
+  const { isLight, themeColors } = useAppTheme();
   const [activeUserId, setActiveUserId] = useState<string | null>(userId);
   const [activeUserData, setActiveUserData] = useState<any>(initialUserData);
   const [userHistory, setUserHistory] = useState<any[]>([]);
@@ -803,12 +805,14 @@ export default function UserDetailModal({
       fullWidth
       PaperProps={{
         sx: {
-          bgcolor: '#0B1315',
-          backgroundImage: 'radial-gradient(circle at 80% 20%, rgba(0, 200, 150, 0.08) 0%, transparent 60%)',
-          color: '#EBF5F3',
+          bgcolor: isLight ? '#FAF8F5' : '#0B1315',
+          backgroundImage: isLight
+            ? 'radial-gradient(circle at 80% 20%, rgba(0, 143, 104, 0.06) 0%, transparent 60%)'
+            : 'radial-gradient(circle at 80% 20%, rgba(0, 200, 150, 0.08) 0%, transparent 60%)',
+          color: themeColors.textPrimary,
           borderRadius: '24px',
-          border: '1px solid rgba(0, 200, 150, 0.25)',
-          boxShadow: '0 25px 60px rgba(0,0,0,0.8)',
+          border: isLight ? '1px solid rgba(45, 80, 60, 0.16)' : '1px solid rgba(0, 200, 150, 0.25)',
+          boxShadow: isLight ? '0 20px 60px rgba(0,0,0,0.1)' : '0 25px 60px rgba(0,0,0,0.8)',
           minHeight: 650,
           maxHeight: '92vh'
         }
