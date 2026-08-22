@@ -21,6 +21,7 @@ import HealingIcon from '@mui/icons-material/Healing';
 import MedicalServicesIcon from '@mui/icons-material/MedicalServices';
 
 import AdminLayout from '@/components/AdminLayout';
+import UserDetailModal from '@/components/UserDetailModal';
 import { adminExtraApi } from '@/services/adminExtraApi';
 
 export default function AssignmentsMatrix() {
@@ -28,6 +29,7 @@ export default function AssignmentsMatrix() {
   const [nurseAssignments, setNurseAssignments] = useState<any[]>([]);
   const [doctorAssignments, setDoctorAssignments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedUser, setSelectedUser] = useState<any>(null);
 
   const fetchData = async () => {
     setLoading(true);
@@ -119,16 +121,26 @@ export default function AssignmentsMatrix() {
                     nurseAssignments.map((a) => (
                       <TableRow key={a.id} sx={{ '&:hover': { bgcolor: 'rgba(255,255,255,0.02)' } }}>
                         <TableCell>
-                          <Typography sx={{ color: '#EBF5F3', fontWeight: 700 }}>
-                            {a.nurseFirstName} {a.nurseLastName}
-                          </Typography>
-                          <Typography variant="caption" sx={{ color: '#00C896' }}>Nurse Practitioner</Typography>
+                          <Box
+                            onClick={() => setSelectedUser({ id: a.nurseId, firstName: a.nurseFirstName, lastName: a.nurseLastName, role: 'nurse' })}
+                            sx={{ cursor: 'pointer', display: 'inline-block', '&:hover': { color: '#00C896' } }}
+                          >
+                            <Typography sx={{ color: '#EBF5F3', fontWeight: 700 }}>
+                              {a.nurseFirstName} {a.nurseLastName}
+                            </Typography>
+                            <Typography variant="caption" sx={{ color: '#00C896' }}>Nurse Practitioner</Typography>
+                          </Box>
                         </TableCell>
                         <TableCell>
-                          <Typography sx={{ color: '#EBF5F3', fontWeight: 700 }}>
-                            {a.patientFirstName} {a.patientLastName}
-                          </Typography>
-                          <Typography variant="caption" sx={{ color: '#94A8A3' }}>Patient</Typography>
+                          <Box
+                            onClick={() => setSelectedUser({ id: a.patientId, firstName: a.patientFirstName, lastName: a.patientLastName, role: 'patient' })}
+                            sx={{ cursor: 'pointer', display: 'inline-block', '&:hover': { color: '#60A5FA' } }}
+                          >
+                            <Typography sx={{ color: '#EBF5F3', fontWeight: 700 }}>
+                              {a.patientFirstName} {a.patientLastName}
+                            </Typography>
+                            <Typography variant="caption" sx={{ color: '#94A8A3' }}>Patient</Typography>
+                          </Box>
                         </TableCell>
                         <TableCell>
                           <Chip
@@ -195,18 +207,28 @@ export default function AssignmentsMatrix() {
                     doctorAssignments.map((d) => (
                       <TableRow key={d.id} sx={{ '&:hover': { bgcolor: 'rgba(255,255,255,0.02)' } }}>
                         <TableCell>
-                          <Typography sx={{ color: '#EBF5F3', fontWeight: 700 }}>
-                            Dr. {d.doctorFirstName} {d.doctorLastName}
-                          </Typography>
-                          <Typography variant="caption" sx={{ color: '#00C896' }}>
-                            {d.doctorSpecialization || 'Physician'}
-                          </Typography>
+                          <Box
+                            onClick={() => setSelectedUser({ id: d.doctorId, firstName: d.doctorFirstName, lastName: d.doctorLastName, role: 'doctor' })}
+                            sx={{ cursor: 'pointer', display: 'inline-block', '&:hover': { color: '#00C896' } }}
+                          >
+                            <Typography sx={{ color: '#EBF5F3', fontWeight: 700 }}>
+                              Dr. {d.doctorFirstName} {d.doctorLastName}
+                            </Typography>
+                            <Typography variant="caption" sx={{ color: '#00C896' }}>
+                              {d.doctorSpecialization || 'Physician'}
+                            </Typography>
+                          </Box>
                         </TableCell>
                         <TableCell>
-                          <Typography sx={{ color: '#EBF5F3', fontWeight: 700 }}>
-                            {d.patientFirstName} {d.patientLastName}
-                          </Typography>
-                          <Typography variant="caption" sx={{ color: '#94A8A3' }}>Patient</Typography>
+                          <Box
+                            onClick={() => setSelectedUser({ id: d.patientId, firstName: d.patientFirstName, lastName: d.patientLastName, role: 'patient' })}
+                            sx={{ cursor: 'pointer', display: 'inline-block', '&:hover': { color: '#60A5FA' } }}
+                          >
+                            <Typography sx={{ color: '#EBF5F3', fontWeight: 700 }}>
+                              {d.patientFirstName} {d.patientLastName}
+                            </Typography>
+                            <Typography variant="caption" sx={{ color: '#94A8A3' }}>Patient</Typography>
+                          </Box>
                         </TableCell>
                         <TableCell>
                           <Chip
@@ -237,6 +259,15 @@ export default function AssignmentsMatrix() {
           )}
         </Paper>
       </Box>
+
+      {/* User 360 Degree Profile & Activity Graph Popup */}
+      <UserDetailModal
+        open={Boolean(selectedUser)}
+        userId={selectedUser?.id || selectedUser?._id || selectedUser?.email}
+        initialUserData={selectedUser}
+        onClose={() => setSelectedUser(null)}
+        onUserUpdated={fetchData}
+      />
     </AdminLayout>
   );
 }

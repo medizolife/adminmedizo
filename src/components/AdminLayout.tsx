@@ -42,8 +42,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [adminUser, setAdminUser] = useState<any>(null);
 
   useEffect(() => {
-    const userStr = localStorage.getItem('adminUser');
-    const token = localStorage.getItem('adminToken');
+    const userStr = localStorage.getItem('adminUser') || localStorage.getItem('user');
+    const token = localStorage.getItem('adminToken') || localStorage.getItem('token');
     if (!token && pathname !== '/login') {
       router.push('/login');
       return;
@@ -58,6 +58,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const handleLogout = () => {
     localStorage.removeItem('adminToken');
     localStorage.removeItem('adminUser');
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
     router.push('/login');
   };
 

@@ -30,8 +30,10 @@ import HealingIcon from '@mui/icons-material/Healing';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import LinkIcon from '@mui/icons-material/Link';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 
 import AdminLayout from '@/components/AdminLayout';
+import UserDetailModal from '@/components/UserDetailModal';
 import { adminApi } from '@/services/adminApi';
 import { adminExtraApi } from '@/services/adminExtraApi';
 
@@ -41,6 +43,7 @@ export default function NursesRoster() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [selectedNurse, setSelectedNurse] = useState<any>(null);
+  const [profileNurse, setProfileNurse] = useState<any>(null);
   const [toastMessage, setToastMessage] = useState('');
 
   // Add nurse dialog
@@ -229,7 +232,10 @@ export default function NursesRoster() {
                     filteredNurses.map((nurse) => (
                       <TableRow key={nurse.id} sx={{ '&:hover': { bgcolor: 'rgba(255,255,255,0.02)' } }}>
                         <TableCell>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                          <Box
+                            onClick={() => setProfileNurse(nurse)}
+                            sx={{ display: 'flex', alignItems: 'center', gap: 1.5, cursor: 'pointer', '&:hover': { opacity: 0.85 } }}
+                          >
                             <Avatar sx={{ bgcolor: '#00C896', color: '#0B1315', fontWeight: 800 }}>
                               {nurse.firstName?.charAt(0) || 'N'}
                             </Avatar>
@@ -280,6 +286,23 @@ export default function NursesRoster() {
                           />
                         </TableCell>
                         <TableCell sx={{ textAlign: 'right' }}>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            startIcon={<TrendingUpIcon />}
+                            onClick={() => setProfileNurse(nurse)}
+                            sx={{
+                              color: '#C084FC',
+                              borderColor: 'rgba(192, 132, 252, 0.4)',
+                              textTransform: 'none',
+                              borderRadius: '8px',
+                              mr: 1,
+                              fontWeight: 800,
+                              '&:hover': { bgcolor: 'rgba(192, 132, 252, 0.15)', borderColor: '#C084FC' }
+                            }}
+                          >
+                            Analytics
+                          </Button>
                           <Button
                             size="small"
                             variant="outlined"
@@ -386,6 +409,15 @@ export default function NursesRoster() {
             </DialogActions>
           </form>
         </Dialog>
+
+        {/* Nurse 360 Degree Profile & Activity Graph Popup */}
+        <UserDetailModal
+          open={Boolean(profileNurse)}
+          userId={profileNurse?.id || profileNurse?._id || profileNurse?.email}
+          initialUserData={profileNurse}
+          onClose={() => setProfileNurse(null)}
+          onUserUpdated={fetchData}
+        />
       </Box>
     </AdminLayout>
   );

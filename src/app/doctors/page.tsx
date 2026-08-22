@@ -29,8 +29,11 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import BlockIcon from '@mui/icons-material/Block';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import DeleteIcon from '@mui/icons-material/Delete';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 
 import AdminLayout from '@/components/AdminLayout';
+import UserDetailModal from '@/components/UserDetailModal';
 import { adminApi } from '@/services/adminApi';
 
 export default function DoctorsRoster() {
@@ -228,7 +231,10 @@ export default function DoctorsRoster() {
                   return (
                     <TableRow key={doc.id || doc._id} sx={{ '& td': { borderColor: 'rgba(255,255,255,0.06)', color: '#EBF5F3' } }}>
                       <TableCell>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                        <Box
+                          onClick={() => setSelectedDoctor(doc)}
+                          sx={{ display: 'flex', alignItems: 'center', gap: 1.5, cursor: 'pointer', '&:hover': { opacity: 0.85 } }}
+                        >
                           <Avatar sx={{ bgcolor: isDeactivated ? '#4B5563' : '#00C896', color: '#0B1315', fontWeight: 800 }}>
                             {doc.firstName?.[0] || 'D'}
                           </Avatar>
@@ -252,17 +258,24 @@ export default function DoctorsRoster() {
                       </TableCell>
                       <TableCell>
                         {doc.digilockerVerified ? (
-                          <Chip
-                            icon={<CheckCircleIcon sx={{ fontSize: '14px !important', color: '#ffffff !important' }} />}
-                            label="DigiLocker Verified"
-                            size="small"
-                            sx={{ bgcolor: '#2e7d32', color: '#ffffff', fontWeight: 800, fontSize: '0.7rem' }}
-                          />
+                          <Box>
+                            <Chip
+                              icon={<CheckCircleIcon sx={{ fontSize: '14px !important', color: '#ffffff !important' }} />}
+                              label="DigiLocker Verified"
+                              size="small"
+                              sx={{ bgcolor: '#2e7d32', color: '#ffffff', fontWeight: 800, fontSize: '0.7rem', mb: 0.3 }}
+                            />
+                            {doc.digilockerProfile?.maskedAadhaar && (
+                              <Typography variant="caption" sx={{ display: 'block', color: '#34D399', fontSize: '0.68rem', fontWeight: 600 }}>
+                                Aadhaar: {doc.digilockerProfile.maskedAadhaar}
+                              </Typography>
+                            )}
+                          </Box>
                         ) : (
                           <Chip
                             label="Unverified"
                             size="small"
-                            sx={{ bgcolor: 'rgba(255,255,255,0.08)', color: '#94A8A3', fontWeight: 700, fontSize: '0.7rem' }}
+                            sx={{ bgcolor: 'rgba(245, 158, 11, 0.15)', color: '#F59E0B', fontWeight: 800, fontSize: '0.7rem', border: '1px solid rgba(245, 158, 11, 0.3)' }}
                           />
                         )}
                       </TableCell>
@@ -283,6 +296,21 @@ export default function DoctorsRoster() {
                       </TableCell>
                       <TableCell align="right">
                         <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
+                          <Button
+                            variant="outlined"
+                            size="small"
+                            onClick={() => setSelectedDoctor(doc)}
+                            startIcon={<TrendingUpIcon />}
+                            sx={{
+                              borderRadius: '10px',
+                              fontWeight: 800,
+                              color: '#00C896',
+                              borderColor: 'rgba(0, 200, 150, 0.4)',
+                              '&:hover': { bgcolor: 'rgba(0, 200, 150, 0.15)', borderColor: '#00C896' }
+                            }}
+                          >
+                            Analytics &amp; Profile
+                          </Button>
                           <Button
                             variant={isDeactivated ? 'contained' : 'outlined'}
                             color={isDeactivated ? 'success' : 'warning'}
@@ -313,6 +341,15 @@ export default function DoctorsRoster() {
           </Table>
         </TableContainer>
       </Paper>
+
+      {/* User 360 Degree Profile & Activity Graph Popup */}
+      <UserDetailModal
+        open={Boolean(selectedDoctor)}
+        userId={selectedDoctor?.id || selectedDoctor?._id || selectedDoctor?.email}
+        initialUserData={selectedDoctor}
+        onClose={() => setSelectedDoctor(null)}
+        onUserUpdated={fetchDoctors}
+      />
     </AdminLayout>
   );
 }

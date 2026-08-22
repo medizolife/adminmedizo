@@ -20,7 +20,7 @@ const api = axios.create({
 // Interceptor to attach x-auth-token
 api.interceptors.request.use(config => {
   if (typeof window !== 'undefined') {
-    const token = localStorage.getItem('adminToken');
+    const token = localStorage.getItem('adminToken') || localStorage.getItem('token');
     if (token) {
       config.headers['x-auth-token'] = token;
       config.headers['Authorization'] = `Bearer ${token}`;
@@ -28,6 +28,21 @@ api.interceptors.request.use(config => {
   }
   return config;
 });
+
+// Response interceptor: automatically redirect to /login if 401 Unauthorized occurs
+api.interceptors.response.use(
+  response => response,
+  error => {
+    if (error.response?.status === 401) {
+      if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
+        localStorage.removeItem('adminToken');
+        localStorage.removeItem('adminUser');
+        window.location.href = '/login';
+      }
+    }
+    return Promise.reject(error);
+  }
+);
 
 export const adminApi = {
   // Login as admin
@@ -75,6 +90,12 @@ export const adminApi = {
   // Get prescription transactions audit log
   getPrescriptionTransactions: async () => {
     const response = await api.get('/admin/prescriptions');
+    return response.data;
+  },
+
+  // Get complete 360-degree user profile, graph analytics, and 50-entry audit timeline
+  getUserDetails: async (userId: string) => {
+    const response = await api.get(`/admin/users/${userId}/details`);
     return response.data;
   }
 };

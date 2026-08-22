@@ -17,11 +17,13 @@ import HomeWorkIcon from '@mui/icons-material/HomeWork';
 import RefreshIcon from '@mui/icons-material/Refresh';
 
 import AdminLayout from '@/components/AdminLayout';
+import UserDetailModal from '@/components/UserDetailModal';
 import { adminExtraApi } from '@/services/adminExtraApi';
 
 export default function HomeCareOversight() {
   const [requests, setRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedUser, setSelectedUser] = useState<any>(null);
 
   const fetchData = async () => {
     setLoading(true);
@@ -116,12 +118,17 @@ export default function HomeCareOversight() {
                           {r.requestNumber}
                         </TableCell>
                         <TableCell>
-                          <Typography sx={{ color: '#EBF5F3', fontWeight: 700 }}>
-                            {r.patientFirstName} {r.patientLastName}
-                          </Typography>
-                          <Typography variant="caption" sx={{ color: '#94A8A3' }}>
-                            {r.contactPhone || r.patientPhone}
-                          </Typography>
+                          <Box
+                            onClick={() => setSelectedUser({ id: r.patientId, firstName: r.patientFirstName, lastName: r.patientLastName, role: 'patient', phone: r.contactPhone || r.patientPhone })}
+                            sx={{ cursor: 'pointer', display: 'inline-block', '&:hover': { color: '#60A5FA' } }}
+                          >
+                            <Typography sx={{ color: '#EBF5F3', fontWeight: 700 }}>
+                              {r.patientFirstName} {r.patientLastName}
+                            </Typography>
+                            <Typography variant="caption" sx={{ color: '#94A8A3' }}>
+                              {r.contactPhone || r.patientPhone}
+                            </Typography>
+                          </Box>
                         </TableCell>
                         <TableCell>
                           <Typography sx={{ color: '#EBF5F3', fontWeight: 600 }}>
@@ -139,13 +146,25 @@ export default function HomeCareOversight() {
                           />
                         </TableCell>
                         <TableCell sx={{ color: '#94A8A3' }}>
-                          {r.requestedByRole === 'doctor' ? (r.doctorFirstName ? `Dr. ${r.doctorFirstName} ${r.doctorLastName}` : 'Doctor') : 'Self (Patient)'}
+                          {r.requestedByRole === 'doctor' ? (
+                            <Box
+                              onClick={() => r.doctorId && setSelectedUser({ id: r.doctorId, firstName: r.doctorFirstName, lastName: r.doctorLastName, role: 'doctor' })}
+                              sx={{ cursor: r.doctorId ? 'pointer' : 'default', '&:hover': { color: '#00C896' } }}
+                            >
+                              {r.doctorFirstName ? `Dr. ${r.doctorFirstName} ${r.doctorLastName}` : 'Doctor'}
+                            </Box>
+                          ) : 'Self (Patient)'}
                         </TableCell>
                         <TableCell>
                           {r.nurseFirstName ? (
-                            <Typography sx={{ color: '#00C896', fontWeight: 700 }}>
-                              {r.nurseFirstName} {r.nurseLastName}
-                            </Typography>
+                            <Box
+                              onClick={() => r.nurseId && setSelectedUser({ id: r.nurseId, firstName: r.nurseFirstName, lastName: r.nurseLastName, role: 'nurse' })}
+                              sx={{ cursor: 'pointer', '&:hover': { color: '#C084FC' } }}
+                            >
+                              <Typography sx={{ color: '#00C896', fontWeight: 700 }}>
+                                {r.nurseFirstName} {r.nurseLastName}
+                              </Typography>
+                            </Box>
                           ) : (
                             <Typography variant="caption" sx={{ color: '#FF9800', fontWeight: 600 }}>
                               Unassigned
@@ -165,6 +184,15 @@ export default function HomeCareOversight() {
           )}
         </Paper>
       </Box>
+
+      {/* User 360 Degree Profile & Activity Graph Popup */}
+      <UserDetailModal
+        open={Boolean(selectedUser)}
+        userId={selectedUser?.id || selectedUser?._id || selectedUser?.email}
+        initialUserData={selectedUser}
+        onClose={() => setSelectedUser(null)}
+        onUserUpdated={fetchData}
+      />
     </AdminLayout>
   );
 }

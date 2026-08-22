@@ -24,6 +24,7 @@ import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import RefreshIcon from '@mui/icons-material/Refresh';
 
 import AdminLayout from '@/components/AdminLayout';
+import UserDetailModal from '@/components/UserDetailModal';
 import { adminApi } from '@/services/adminApi';
 
 export default function DashboardOverview() {
@@ -31,6 +32,7 @@ export default function DashboardOverview() {
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [recentTransactions, setRecentTransactions] = useState<any[]>([]);
+  const [selectedUser, setSelectedUser] = useState<any>(null);
 
   const fetchDashboardData = async () => {
     setLoading(true);
@@ -295,11 +297,35 @@ export default function DashboardOverview() {
                         <TableCell sx={{ fontSize: '0.85rem' }}>
                           {tx.createdAt ? new Date(tx.createdAt).toLocaleString() : 'N/A'}
                         </TableCell>
-                        <TableCell sx={{ fontWeight: 700, color: '#33D3AA' }}>
-                          {tx.doctor?.name || 'Unknown Doctor'}
+                        <TableCell>
+                          <Chip
+                            label={tx.doctor?.name || 'Unknown Doctor'}
+                            size="small"
+                            onClick={() => setSelectedUser({ id: tx.doctor?.id, firstName: tx.doctor?.name, role: 'doctor', email: tx.doctor?.email })}
+                            sx={{
+                              bgcolor: 'rgba(0, 200, 150, 0.15)',
+                              color: '#33D3AA',
+                              fontWeight: 800,
+                              cursor: 'pointer',
+                              border: '1px solid rgba(0, 200, 150, 0.3)',
+                              '&:hover': { bgcolor: 'rgba(0, 200, 150, 0.3)' }
+                            }}
+                          />
                         </TableCell>
-                        <TableCell sx={{ fontWeight: 700 }}>
-                          {tx.patient?.name || 'Unknown Patient'}
+                        <TableCell>
+                          <Chip
+                            label={tx.patient?.name || 'Unknown Patient'}
+                            size="small"
+                            onClick={() => setSelectedUser({ id: tx.patient?.id, firstName: tx.patient?.name, role: 'patient', email: tx.patient?.email })}
+                            sx={{
+                              bgcolor: 'rgba(59, 130, 246, 0.15)',
+                              color: '#60A5FA',
+                              fontWeight: 800,
+                              cursor: 'pointer',
+                              border: '1px solid rgba(59, 130, 246, 0.3)',
+                              '&:hover': { bgcolor: 'rgba(59, 130, 246, 0.3)' }
+                            }}
+                          />
                         </TableCell>
                         <TableCell>
                           {Array.isArray(tx.provisionalDiagnosis) ? tx.provisionalDiagnosis.join(', ') : (tx.medication || 'General')}
@@ -326,6 +352,15 @@ export default function DashboardOverview() {
           </Paper>
         </>
       )}
+
+      {/* User 360 Degree Profile & Activity Graph Popup */}
+      <UserDetailModal
+        open={Boolean(selectedUser)}
+        userId={selectedUser?.id || selectedUser?._id || selectedUser?.email}
+        initialUserData={selectedUser}
+        onClose={() => setSelectedUser(null)}
+        onUserUpdated={fetchDashboardData}
+      />
     </AdminLayout>
   );
 }

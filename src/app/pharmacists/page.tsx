@@ -28,8 +28,10 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import BlockIcon from '@mui/icons-material/Block';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import DeleteIcon from '@mui/icons-material/Delete';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 
 import AdminLayout from '@/components/AdminLayout';
+import UserDetailModal from '@/components/UserDetailModal';
 import { adminApi } from '@/services/adminApi';
 
 export default function PharmacistsRoster() {
@@ -37,6 +39,7 @@ export default function PharmacistsRoster() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [selectedPharmacist, setSelectedPharmacist] = useState<any>(null);
   const [toastMessage, setToastMessage] = useState('');
   
   // Modal state for adding new Pharmacist
@@ -47,7 +50,7 @@ export default function PharmacistsRoster() {
     firstName: '',
     lastName: '',
     email: '',
-    password: 'password123',
+    password: '',
     pharmacyName: '',
     licenseNumber: '',
     pharmacyAddress: '',
@@ -128,7 +131,7 @@ export default function PharmacistsRoster() {
           firstName: '',
           lastName: '',
           email: '',
-          password: 'password123',
+          password: '',
           pharmacyName: '',
           licenseNumber: '',
           pharmacyAddress: '',
@@ -273,7 +276,10 @@ export default function PharmacistsRoster() {
                   return (
                     <TableRow key={pharm.id || pharm._id} sx={{ '& td': { borderColor: 'rgba(255,255,255,0.06)', color: '#EBF5F3' } }}>
                       <TableCell>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                        <Box
+                          onClick={() => setSelectedPharmacist(pharm)}
+                          sx={{ display: 'flex', alignItems: 'center', gap: 1.5, cursor: 'pointer', '&:hover': { opacity: 0.85 } }}
+                        >
                           <Avatar sx={{ bgcolor: isDeactivated ? '#4B5563' : '#F59E0B', color: '#0B1315', fontWeight: 800 }}>
                             {pharm.firstName?.[0] || 'P'}
                           </Avatar>
@@ -317,6 +323,21 @@ export default function PharmacistsRoster() {
                       </TableCell>
                       <TableCell align="right">
                         <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
+                          <Button
+                            variant="outlined"
+                            size="small"
+                            onClick={() => setSelectedPharmacist(pharm)}
+                            startIcon={<TrendingUpIcon />}
+                            sx={{
+                              borderRadius: '10px',
+                              fontWeight: 800,
+                              color: '#F59E0B',
+                              borderColor: 'rgba(245, 158, 11, 0.4)',
+                              '&:hover': { bgcolor: 'rgba(245, 158, 11, 0.15)', borderColor: '#F59E0B' }
+                            }}
+                          >
+                            Analytics &amp; Profile
+                          </Button>
                           <Button
                             variant={isDeactivated ? 'contained' : 'outlined'}
                             color={isDeactivated ? 'success' : 'warning'}
@@ -442,6 +463,15 @@ export default function PharmacistsRoster() {
           </DialogActions>
         </form>
       </Dialog>
+
+      {/* Pharmacist 360 Degree Profile & Activity Graph Popup */}
+      <UserDetailModal
+        open={Boolean(selectedPharmacist)}
+        userId={selectedPharmacist?.id || selectedPharmacist?._id || selectedPharmacist?.email}
+        initialUserData={selectedPharmacist}
+        onClose={() => setSelectedPharmacist(null)}
+        onUserUpdated={fetchPharmacists}
+      />
     </AdminLayout>
   );
 }

@@ -23,8 +23,10 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import BlockIcon from '@mui/icons-material/Block';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import DeleteIcon from '@mui/icons-material/Delete';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 
 import AdminLayout from '@/components/AdminLayout';
+import UserDetailModal from '@/components/UserDetailModal';
 import { adminApi } from '@/services/adminApi';
 
 export default function PatientsRoster() {
@@ -32,6 +34,7 @@ export default function PatientsRoster() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [selectedPatient, setSelectedPatient] = useState<any>(null);
   const [toastMessage, setToastMessage] = useState('');
 
   const fetchPatients = async () => {
@@ -213,7 +216,10 @@ export default function PatientsRoster() {
                   return (
                     <TableRow key={pat.id || pat._id} sx={{ '& td': { borderColor: 'rgba(255,255,255,0.06)', color: '#EBF5F3' } }}>
                       <TableCell>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                        <Box
+                          onClick={() => setSelectedPatient(pat)}
+                          sx={{ display: 'flex', alignItems: 'center', gap: 1.5, cursor: 'pointer', '&:hover': { opacity: 0.85 } }}
+                        >
                           <Avatar sx={{ bgcolor: isDeactivated ? '#4B5563' : '#3B82F6', color: '#ffffff', fontWeight: 800 }}>
                             {pat.firstName?.[0] || 'P'}
                           </Avatar>
@@ -260,6 +266,21 @@ export default function PatientsRoster() {
                       <TableCell align="right">
                         <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
                           <Button
+                            variant="outlined"
+                            size="small"
+                            onClick={() => setSelectedPatient(pat)}
+                            startIcon={<TrendingUpIcon />}
+                            sx={{
+                              borderRadius: '10px',
+                              fontWeight: 800,
+                              color: '#3B82F6',
+                              borderColor: 'rgba(59, 130, 246, 0.4)',
+                              '&:hover': { bgcolor: 'rgba(59, 130, 246, 0.15)', borderColor: '#3B82F6' }
+                            }}
+                          >
+                            Analytics &amp; Profile
+                          </Button>
+                          <Button
                             variant={isDeactivated ? 'contained' : 'outlined'}
                             color={isDeactivated ? 'success' : 'warning'}
                             size="small"
@@ -289,6 +310,15 @@ export default function PatientsRoster() {
           </Table>
         </TableContainer>
       </Paper>
+
+      {/* Patient 360 Degree Profile & Activity Graph Popup */}
+      <UserDetailModal
+        open={Boolean(selectedPatient)}
+        userId={selectedPatient?.id || selectedPatient?._id || selectedPatient?.email}
+        initialUserData={selectedPatient}
+        onClose={() => setSelectedPatient(null)}
+        onUserUpdated={fetchPatients}
+      />
     </AdminLayout>
   );
 }

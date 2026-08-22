@@ -17,11 +17,13 @@ import SwapHorizIcon from '@mui/icons-material/SwapHoriz';
 import RefreshIcon from '@mui/icons-material/Refresh';
 
 import AdminLayout from '@/components/AdminLayout';
+import UserDetailModal from '@/components/UserDetailModal';
 import { adminExtraApi } from '@/services/adminExtraApi';
 
 export default function ReferralsOversight() {
   const [referrals, setReferrals] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedUser, setSelectedUser] = useState<any>(null);
 
   const fetchData = async () => {
     setLoading(true);
@@ -114,14 +116,35 @@ export default function ReferralsOversight() {
                         <TableCell sx={{ color: '#00C896', fontWeight: 700, fontFamily: 'monospace' }}>
                           {r.referralNumber}
                         </TableCell>
-                        <TableCell sx={{ color: '#EBF5F3', fontWeight: 700 }}>
-                          Dr. {r.referringDoctorFirstName} {r.referringDoctorLastName}
+                        <TableCell>
+                          <Box
+                            onClick={() => setSelectedUser({ id: r.referringDoctorId, firstName: r.referringDoctorFirstName, lastName: r.referringDoctorLastName, role: 'doctor' })}
+                            sx={{ cursor: 'pointer', display: 'inline-block', '&:hover': { color: '#00C896' } }}
+                          >
+                            <Typography variant="body2" sx={{ fontWeight: 700, color: '#EBF5F3' }}>
+                              Dr. {r.referringDoctorFirstName} {r.referringDoctorLastName}
+                            </Typography>
+                          </Box>
                         </TableCell>
-                        <TableCell sx={{ color: '#00C896', fontWeight: 700 }}>
-                          Dr. {r.referredDoctorFirstName} {r.referredDoctorLastName}
+                        <TableCell>
+                          <Box
+                            onClick={() => setSelectedUser({ id: r.referredDoctorId, firstName: r.referredDoctorFirstName, lastName: r.referredDoctorLastName, role: 'doctor' })}
+                            sx={{ cursor: 'pointer', display: 'inline-block', '&:hover': { color: '#38BDF8' } }}
+                          >
+                            <Typography variant="body2" sx={{ fontWeight: 700, color: '#00C896' }}>
+                              Dr. {r.referredDoctorFirstName} {r.referredDoctorLastName}
+                            </Typography>
+                          </Box>
                         </TableCell>
-                        <TableCell sx={{ color: '#EBF5F3' }}>
-                          {r.patientFirstName} {r.patientLastName}
+                        <TableCell>
+                          <Box
+                            onClick={() => setSelectedUser({ id: r.patientId, firstName: r.patientFirstName, lastName: r.patientLastName, role: 'patient' })}
+                            sx={{ cursor: 'pointer', display: 'inline-block', '&:hover': { color: '#60A5FA' } }}
+                          >
+                            <Typography variant="body2" sx={{ fontWeight: 700, color: '#EBF5F3' }}>
+                              {r.patientFirstName} {r.patientLastName}
+                            </Typography>
+                          </Box>
                         </TableCell>
                         <TableCell sx={{ color: '#94A8A3', maxWidth: 260 }}>
                           <Typography variant="body2" noWrap sx={{ color: '#EBF5F3', fontWeight: 600 }}>
@@ -155,6 +178,15 @@ export default function ReferralsOversight() {
           )}
         </Paper>
       </Box>
+
+      {/* User 360 Degree Profile & Activity Graph Popup */}
+      <UserDetailModal
+        open={Boolean(selectedUser)}
+        userId={selectedUser?.id || selectedUser?._id || selectedUser?.email}
+        initialUserData={selectedUser}
+        onClose={() => setSelectedUser(null)}
+        onUserUpdated={fetchData}
+      />
     </AdminLayout>
   );
 }

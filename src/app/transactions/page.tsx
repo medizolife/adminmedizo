@@ -28,6 +28,7 @@ import QrCode2Icon from '@mui/icons-material/QrCode2';
 import CloseIcon from '@mui/icons-material/Close';
 
 import AdminLayout from '@/components/AdminLayout';
+import UserDetailModal from '@/components/UserDetailModal';
 import { adminApi } from '@/services/adminApi';
 
 export default function PrescriptionTransactions() {
@@ -36,6 +37,7 @@ export default function PrescriptionTransactions() {
   const [search, setSearch] = useState('');
   const [selectedTx, setSelectedTx] = useState<any>(null);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<any>(null);
 
   const fetchTransactions = async () => {
     setLoading(true);
@@ -157,20 +159,30 @@ export default function PrescriptionTransactions() {
                       #{String(tx.id).slice(-8)}
                     </TableCell>
                     <TableCell>
-                      <Typography variant="body2" sx={{ fontWeight: 800, color: '#33D3AA' }}>
-                        {tx.doctor?.name || 'Unknown Doctor'}
-                      </Typography>
-                      <Typography variant="caption" sx={{ color: '#94A8A3' }}>
-                        {tx.doctor?.specialization || 'General Physician'}
-                      </Typography>
+                      <Box
+                        onClick={() => setSelectedUser({ id: tx.doctor?.id, firstName: tx.doctor?.name, role: 'doctor', email: tx.doctor?.email })}
+                        sx={{ cursor: 'pointer', display: 'inline-block', '&:hover': { opacity: 0.8 } }}
+                      >
+                        <Typography variant="body2" sx={{ fontWeight: 800, color: '#33D3AA' }}>
+                          {tx.doctor?.name || 'Unknown Doctor'}
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: '#94A8A3' }}>
+                          {tx.doctor?.specialization || 'General Physician'}
+                        </Typography>
+                      </Box>
                     </TableCell>
                     <TableCell>
-                      <Typography variant="body2" sx={{ fontWeight: 800 }}>
-                        {tx.patient?.name || 'Unknown Patient'}
-                      </Typography>
-                      <Typography variant="caption" sx={{ color: '#94A8A3' }}>
-                        {tx.patient?.email || 'N/A'}
-                      </Typography>
+                      <Box
+                        onClick={() => setSelectedUser({ id: tx.patient?.id, firstName: tx.patient?.name, role: 'patient', email: tx.patient?.email })}
+                        sx={{ cursor: 'pointer', display: 'inline-block', '&:hover': { opacity: 0.8 } }}
+                      >
+                        <Typography variant="body2" sx={{ fontWeight: 800, color: '#60A5FA' }}>
+                          {tx.patient?.name || 'Unknown Patient'}
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: '#94A8A3' }}>
+                          {tx.patient?.email || 'N/A'}
+                        </Typography>
+                      </Box>
                     </TableCell>
                     <TableCell>
                       <Typography variant="body2" sx={{ fontWeight: 700 }}>
@@ -313,6 +325,15 @@ export default function PrescriptionTransactions() {
           </>
         )}
       </Dialog>
+
+      {/* User 360 Degree Profile & Activity Graph Popup */}
+      <UserDetailModal
+        open={Boolean(selectedUser)}
+        userId={selectedUser?.id || selectedUser?._id || selectedUser?.email}
+        initialUserData={selectedUser}
+        onClose={() => setSelectedUser(null)}
+        onUserUpdated={fetchTransactions}
+      />
     </AdminLayout>
   );
 }
