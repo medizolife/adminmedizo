@@ -25,13 +25,13 @@ export default function ThemeRegistry({ children }: { children: React.ReactNode 
 
         [data-theme='light'] {
           --color-teal: #008F68;
-          --color-mint: #10B981;
+          --color-mint: #059669;
           --color-dark-bg: #FAF8F5;
           --color-panel-bg: #FFFFFF;
           --color-panel-elevated: #F3EFE6;
           --color-panel-subtle: #EBE5D8;
-          --color-text-primary: #182824;
-          --color-text-secondary: #526660;
+          --color-text-primary: #0F172A;
+          --color-text-secondary: #475569;
           --glass-border: rgba(45, 80, 60, 0.12);
           --scrollbar-track: #FAF8F5;
           --scrollbar-thumb: #D5CEBF;
@@ -50,43 +50,83 @@ export default function ThemeRegistry({ children }: { children: React.ReactNode 
         }
 
         /* ─────────────────────────────────────────────────────────────
-           LIGHT MODE UNIVERSAL STYLING OVERRIDES (Warm Beige & Olive)
+           LIGHT MODE UNIVERSAL STYLING OVERRIDES (Crisp Navy / Charcoal)
         ───────────────────────────────────────────────────────────── */
         [data-theme='light'] body {
           background-color: #FAF8F5 !important;
-          color: #182824 !important;
+          color: #0F172A !important;
+        }
+
+        /* Direct Text Color Overrides for elements styled with #EBF5F3 or #94A8A3 or white */
+        [data-theme='light'] [style*="color: #EBF5F3"],
+        [data-theme='light'] [style*="color: rgb(235, 245, 243)"],
+        [data-theme='light'] [style*="color:#EBF5F3"],
+        [data-theme='light'] [style*="color: #ebf5f3"],
+        [data-theme='light'] [style*="color: rgb(235,245,243)"] {
+          color: #0F172A !important;
+        }
+
+        [data-theme='light'] [style*="color: #94A8A3"],
+        [data-theme='light'] [style*="color: rgb(148, 168, 163)"],
+        [data-theme='light'] [style*="color:#94A8A3"],
+        [data-theme='light'] [style*="color: #94a8a3"],
+        [data-theme='light'] [style*="color: rgb(148,168,163)"] {
+          color: #475569 !important;
+        }
+
+        [data-theme='light'] [style*="color: #6B8A82"],
+        [data-theme='light'] [style*="color: #6b8a82"] {
+          color: #475569 !important;
+        }
+
+        /* Typography Defaults */
+        [data-theme='light'] .MuiTypography-root {
+          color: #0F172A;
+        }
+
+        [data-theme='light'] .MuiTypography-h1,
+        [data-theme='light'] .MuiTypography-h2,
+        [data-theme='light'] .MuiTypography-h3,
+        [data-theme='light'] .MuiTypography-h4,
+        [data-theme='light'] .MuiTypography-h5,
+        [data-theme='light'] .MuiTypography-h6,
+        [data-theme='light'] .MuiTypography-subtitle1,
+        [data-theme='light'] .MuiTypography-subtitle2 {
+          color: #0F172A !important;
+        }
+
+        [data-theme='light'] .MuiTypography-body1,
+        [data-theme='light'] .MuiTypography-body2 {
+          color: #1E293B !important;
+        }
+
+        [data-theme='light'] .MuiTypography-caption {
+          color: #475569 !important;
         }
 
         /* Cards & Papers */
         [data-theme='light'] .MuiPaper-root {
           background-color: #FFFFFF !important;
-          color: #182824 !important;
+          color: #0F172A !important;
           border-color: rgba(45, 80, 60, 0.12) !important;
           box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03) !important;
-        }
-
-        [data-theme='light'] .MuiPaper-root[style*="background-color: #131F22"],
-        [data-theme='light'] .MuiPaper-root[style*="background-color: rgb(19, 31, 34)"] {
-          background-color: #FFFFFF !important;
-          color: #182824 !important;
-          border-color: rgba(45, 80, 60, 0.12) !important;
         }
 
         /* Dialogs & Modals */
         [data-theme='light'] .MuiDialog-paper {
           background-color: #FAF8F5 !important;
-          color: #182824 !important;
+          color: #0F172A !important;
           border: 1px solid rgba(45, 80, 60, 0.16) !important;
           box-shadow: 0 20px 60px rgba(0, 0, 0, 0.12) !important;
         }
 
         [data-theme='light'] .MuiDialogTitle-root {
           border-bottom-color: rgba(45, 80, 60, 0.1) !important;
-          color: #182824 !important;
+          color: #0F172A !important;
         }
 
         [data-theme='light'] .MuiDialogContent-root {
-          color: #182824 !important;
+          color: #0F172A !important;
         }
 
         [data-theme='light'] .MuiDialogActions-root {
@@ -96,27 +136,27 @@ export default function ThemeRegistry({ children }: { children: React.ReactNode 
         /* Sidebar Drawer */
         [data-theme='light'] .MuiDrawer-paper {
           background-color: #F5F1E8 !important;
-          color: #182824 !important;
+          color: #0F172A !important;
           border-right: 1px solid rgba(45, 80, 60, 0.14) !important;
         }
 
         /* Top Header */
         [data-theme='light'] .MuiAppBar-root {
           background-color: rgba(250, 248, 245, 0.94) !important;
-          color: #182824 !important;
+          color: #0F172A !important;
           border-bottom: 1px solid rgba(45, 80, 60, 0.12) !important;
           backdrop-filter: blur(12px) !important;
         }
 
         /* Tables & Rows */
         [data-theme='light'] .MuiTableCell-root {
-          color: #182824 !important;
+          color: #0F172A !important;
           border-bottom: 1px solid rgba(45, 80, 60, 0.08) !important;
         }
 
         [data-theme='light'] .MuiTableCell-head {
           background-color: #EBE5D8 !important;
-          color: #2D4A41 !important;
+          color: #1E293B !important;
           font-weight: 800 !important;
         }
 
@@ -127,7 +167,7 @@ export default function ThemeRegistry({ children }: { children: React.ReactNode 
         /* Inputs & TextFields */
         [data-theme='light'] .MuiInputBase-root {
           background-color: #FFFFFF !important;
-          color: #182824 !important;
+          color: #0F172A !important;
         }
 
         [data-theme='light'] .MuiOutlinedInput-notchedOutline {
@@ -138,13 +178,18 @@ export default function ThemeRegistry({ children }: { children: React.ReactNode 
           border-color: #008F68 !important;
         }
 
+        /* Chips */
+        [data-theme='light'] .MuiChip-root {
+          border-color: rgba(45, 80, 60, 0.18);
+        }
+
         /* Tabs & Indicators */
         [data-theme='light'] .MuiTabs-root {
           background-color: #F5F1E8 !important;
         }
 
         [data-theme='light'] .MuiTab-root {
-          color: #526660 !important;
+          color: #475569 !important;
         }
 
         [data-theme='light'] .MuiTab-root.Mui-selected {
@@ -155,30 +200,10 @@ export default function ThemeRegistry({ children }: { children: React.ReactNode 
           background-color: #008F68 !important;
         }
 
-        /* Typography Colors in Light Mode */
-        [data-theme='light'] .MuiTypography-h1,
-        [data-theme='light'] .MuiTypography-h2,
-        [data-theme='light'] .MuiTypography-h3,
-        [data-theme='light'] .MuiTypography-h4,
-        [data-theme='light'] .MuiTypography-h5,
-        [data-theme='light'] .MuiTypography-h6,
-        [data-theme='light'] .MuiTypography-subtitle1 {
-          color: #182824;
-        }
-
-        [data-theme='light'] .MuiTypography-body1,
-        [data-theme='light'] .MuiTypography-body2 {
-          color: #2D3E3A;
-        }
-
-        [data-theme='light'] .MuiTypography-caption {
-          color: #526660;
-        }
-
         /* Menus & Popovers */
         [data-theme='light'] .MuiMenu-paper {
           background-color: #FFFFFF !important;
-          color: #182824 !important;
+          color: #0F172A !important;
           border: 1px solid rgba(45, 80, 60, 0.15) !important;
           box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08) !important;
         }
@@ -190,7 +215,7 @@ export default function ThemeRegistry({ children }: { children: React.ReactNode 
         /* Code and Pre Elements */
         [data-theme='light'] pre {
           background-color: #F3EFE6 !important;
-          color: #182824 !important;
+          color: #0F172A !important;
           border: 1px solid rgba(45, 80, 60, 0.15) !important;
         }
 

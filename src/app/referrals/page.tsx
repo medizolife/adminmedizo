@@ -39,9 +39,11 @@ import VisibilityIcon from '@mui/icons-material/Visibility';
 import AdminLayout from '@/components/AdminLayout';
 import UserDetailModal from '@/components/UserDetailModal';
 import { useAdminData } from '@/context/AdminDataContext';
+import { useAppTheme } from '@/context/ThemeContext';
 
 export default function ReferralsOversight() {
   const { referrals, isPreloaded, isSyncing, refreshSection, updateReferralStatusLocal } = useAdminData();
+  const { isLight, themeColors } = useAppTheme();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedUser, setSelectedUser] = useState<any>(null);
@@ -60,154 +62,150 @@ export default function ReferralsOversight() {
     }
     if (search.trim()) {
       const q = search.toLowerCase();
-      const match =
-        (r.referralNumber && r.referralNumber.toLowerCase().includes(q)) ||
-        (r.referringDoctorFirstName && r.referringDoctorFirstName.toLowerCase().includes(q)) ||
-        (r.referringDoctorLastName && r.referringDoctorLastName.toLowerCase().includes(q)) ||
-        (r.referredDoctorFirstName && r.referredDoctorFirstName.toLowerCase().includes(q)) ||
-        (r.referredDoctorLastName && r.referredDoctorLastName.toLowerCase().includes(q)) ||
-        (r.patientFirstName && r.patientFirstName.toLowerCase().includes(q)) ||
-        (r.patientLastName && r.patientLastName.toLowerCase().includes(q)) ||
-        (r.reason && r.reason.toLowerCase().includes(q)) ||
-        (r.clinicalSummary && r.clinicalSummary.toLowerCase().includes(q));
-      if (!match) return false;
+      return (
+        String(r.referralNumber || '').toLowerCase().includes(q) ||
+        String(r.referringDoctorFirstName || '').toLowerCase().includes(q) ||
+        String(r.referringDoctorLastName || '').toLowerCase().includes(q) ||
+        String(r.referredDoctorFirstName || '').toLowerCase().includes(q) ||
+        String(r.referredDoctorLastName || '').toLowerCase().includes(q) ||
+        String(r.patientFirstName || '').toLowerCase().includes(q) ||
+        String(r.patientLastName || '').toLowerCase().includes(q) ||
+        String(r.reason || '').toLowerCase().includes(q)
+      );
     }
     return true;
   });
 
-  // KPI Metrics Calculation
-  const totalReferrals = refList.length;
-  const pendingTriage = refList.filter((r: any) => r.status === 'pending').length;
-  const urgentCount = refList.filter((r: any) => r.priority === 'urgent' || r.urgency === 'urgent').length;
-  const completedTransfers = refList.filter((r: any) => r.status === 'accepted' || r.status === 'completed').length;
+  const pendingCount = refList.filter((r: any) => r.status === 'pending').length;
+  const acceptedCount = refList.filter((r: any) => r.status === 'accepted').length;
+  const urgentCount = refList.filter((r: any) => r.priority === 'urgent').length;
+  const completedTransfers = refList.filter((r: any) => r.status === 'completed').length;
 
-  const handleOpenReferral = (r: any) => {
-    setSelectedReferral(r);
-    setNewStatus(r.status || 'pending');
-    setResponseNotes(r.responseNotes || '');
+  const handleOpenReferral = (ref: any) => {
+    setSelectedReferral(ref);
+    setNewStatus(ref.status || 'pending');
+    setResponseNotes(ref.responseNotes || '');
   };
 
   const handleSaveReferral = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedReferral) return;
     setActionLoading(true);
-
     try {
       await updateReferralStatusLocal(selectedReferral.id, newStatus, responseNotes);
-      setToastMessage(`✅ Referral #${selectedReferral.referralNumber} status updated to ${newStatus.toUpperCase()}`);
+      setToastMessage(`Referral #${selectedReferral.referralNumber} status updated to ${newStatus.toUpperCase()}!`);
       setSelectedReferral(null);
     } catch (err) {
-      alert('Failed to update referral');
+      console.error(err);
+      alert('Failed to update referral status.');
     } finally {
       setActionLoading(false);
     }
   };
 
   const getStatusChip = (status: string) => {
-    const map: Record<string, { color: string; bg: string }> = {
-      pending: { color: '#FF9800', bg: 'rgba(255,152,0,0.15)' },
-      accepted: { color: '#2196F3', bg: 'rgba(33,150,243,0.15)' },
-      completed: { color: '#4CAF50', bg: 'rgba(76,175,80,0.15)' },
-      rejected: { color: '#F44336', bg: 'rgba(244,67,54,0.15)' },
-      cancelled: { color: '#94A8A3', bg: 'rgba(255,255,255,0.05)' }
-    };
-    const s = map[status] || { color: '#94A8A3', bg: 'rgba(255,255,255,0.05)' };
-    return (
-      <Chip
-        label={(status || 'pending').toUpperCase()}
-        size="small"
-        sx={{ bgcolor: s.bg, color: s.color, fontWeight: 800, fontSize: '0.72rem' }}
-      />
-    );
+    switch (status) {
+      case 'pending':
+        return <Chip label="Pending" size="small" sx={{ bgcolor: 'rgba(255, 152, 0, 0.15)', color: '#FF9800', fontWeight: 800, fontSize: '0.72rem' }} />;
+      case 'accepted':
+        return <Chip label="Accepted" size="small" sx={{ bgcolor: isLight ? 'rgba(2, 132, 199, 0.12)' : 'rgba(56, 189, 248, 0.15)', color: themeColors.accentSecondary, fontWeight: 800, fontSize: '0.72rem' }} />;
+      case 'completed':
+        return <Chip label="Completed" size="small" sx={{ bgcolor: 'rgba(76, 175, 80, 0.15)', color: isLight ? '#059669' : '#4CAF50', fontWeight: 800, fontSize: '0.72rem' }} />;
+      case 'rejected':
+        return <Chip label="Rejected" size="small" sx={{ bgcolor: 'rgba(244, 67, 54, 0.15)', color: '#F44336', fontWeight: 800, fontSize: '0.72rem' }} />;
+      case 'cancelled':
+        return <Chip label="Cancelled" size="small" sx={{ bgcolor: isLight ? '#EBE5D8' : 'rgba(255, 255, 255, 0.05)', color: themeColors.textSecondary, fontWeight: 800, fontSize: '0.72rem' }} />;
+      default:
+        return <Chip label={status || 'Unknown'} size="small" sx={{ bgcolor: isLight ? '#EBE5D8' : 'rgba(255, 255, 255, 0.05)', color: themeColors.textSecondary, fontWeight: 800, fontSize: '0.72rem' }} />;
+    }
   };
 
   return (
     <AdminLayout>
-      <Box sx={{ p: { xs: 2, md: 4 } }}>
+      <Box sx={{ mb: 4 }}>
         {/* Header */}
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, flexWrap: 'wrap', gap: 2 }}>
           <Box>
-            <Typography variant="h4" sx={{ fontWeight: 900, color: '#EBF5F3', display: 'flex', alignItems: 'center', gap: 1.5 }}>
-              <SwapHorizIcon sx={{ color: '#00C896', fontSize: '2.2rem' }} />
-              Doctor Clinical Network &amp; Referrals Oversight
+            <Typography variant="h4" sx={{ fontWeight: 900, color: themeColors.textPrimary, display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              <SwapHorizIcon sx={{ color: themeColors.accentSecondary, fontSize: 32 }} /> Doctor-to-Doctor Referral Network
             </Typography>
-            <Typography variant="body2" sx={{ color: '#94A8A3', mt: 0.5 }}>
-              Inter-doctor specialty transfers, second opinion handoffs, and specialist triage
+            <Typography variant="body2" sx={{ color: themeColors.textSecondary, mt: 0.5 }}>
+              Inter-specialist clinical handoffs, second opinions, emergency escalations, and diagnostic referrals
             </Typography>
           </Box>
           <Button
             variant="outlined"
             onClick={() => refreshSection('referrals')}
             startIcon={<RefreshIcon sx={{ animation: isSyncing ? 'spin 1s linear infinite' : 'none' }} />}
-            sx={{ color: '#00C896', borderColor: 'rgba(0,200,150,0.3)', borderRadius: '12px', textTransform: 'none', fontWeight: 700 }}
+            sx={{ borderRadius: '12px', borderColor: isLight ? 'rgba(2, 132, 199, 0.4)' : 'rgba(56, 189, 248, 0.3)', color: themeColors.accentSecondary, fontWeight: 700 }}
           >
             Refresh Referrals
           </Button>
         </Box>
 
         {toastMessage && (
-          <Alert severity="success" onClose={() => setToastMessage('')} sx={{ mb: 3, borderRadius: '14px', bgcolor: 'rgba(16, 185, 129, 0.15)', color: '#34D399' }}>
+          <Alert severity="success" onClose={() => setToastMessage('')} sx={{ mb: 3, borderRadius: '12px', bgcolor: 'rgba(16, 185, 129, 0.15)', color: isLight ? '#065F46' : '#34D399' }}>
             {toastMessage}
           </Alert>
         )}
 
-        {/* 4 Executive KPI Metric Cards */}
+        {/* 4 Status KPI Strip */}
         <Grid container spacing={2.5} sx={{ mb: 3.5 }}>
           <Grid item xs={6} sm={3}>
-            <Paper sx={{ p: 2.2, borderRadius: '18px', bgcolor: '#131F22', border: '1px solid rgba(0, 200, 150, 0.2)' }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: '#00C896', mb: 0.5 }}>
-                <SwapHorizIcon sx={{ fontSize: 18 }} />
-                <Typography variant="caption" sx={{ fontWeight: 800, textTransform: 'uppercase' }}>Total Referrals</Typography>
-              </Box>
-              <Typography variant="h4" sx={{ fontWeight: 900, color: '#EBF5F3' }}>
-                {totalReferrals}
-              </Typography>
-              <Typography variant="caption" sx={{ color: '#94A8A3' }}>Cross-Specialty Transfers</Typography>
-            </Paper>
-          </Grid>
-
-          <Grid item xs={6} sm={3}>
-            <Paper sx={{ p: 2.2, borderRadius: '18px', bgcolor: '#131F22', border: '1px solid rgba(255, 152, 0, 0.25)' }}>
+            <Paper sx={{ p: 2.2, borderRadius: '18px', bgcolor: themeColors.bgPaper, border: `1px solid ${themeColors.border}` }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: '#FF9800', mb: 0.5 }}>
                 <PendingActionsIcon sx={{ fontSize: 18 }} />
                 <Typography variant="caption" sx={{ fontWeight: 800, textTransform: 'uppercase' }}>Pending Triage</Typography>
               </Box>
               <Typography variant="h4" sx={{ fontWeight: 900, color: '#FF9800' }}>
-                {pendingTriage}
+                {pendingCount}
               </Typography>
-              <Typography variant="caption" sx={{ color: '#94A8A3' }}>Awaiting Specialist Acceptance</Typography>
+              <Typography variant="caption" sx={{ color: themeColors.textSecondary }}>Awaiting Specialist Review</Typography>
             </Paper>
           </Grid>
 
           <Grid item xs={6} sm={3}>
-            <Paper sx={{ p: 2.2, borderRadius: '18px', bgcolor: '#131F22', border: '1px solid rgba(239, 68, 68, 0.25)' }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: '#EF4444', mb: 0.5 }}>
-                <WarningAmberIcon sx={{ fontSize: 18 }} />
-                <Typography variant="caption" sx={{ fontWeight: 800, textTransform: 'uppercase' }}>Urgent Priority</Typography>
+            <Paper sx={{ p: 2.2, borderRadius: '18px', bgcolor: themeColors.bgPaper, border: `1px solid ${themeColors.border}` }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: themeColors.accentSecondary, mb: 0.5 }}>
+                <AssignmentTurnedInIcon sx={{ fontSize: 18 }} />
+                <Typography variant="caption" sx={{ fontWeight: 800, textTransform: 'uppercase' }}>Accepted Referrals</Typography>
               </Box>
-              <Typography variant="h4" sx={{ fontWeight: 900, color: '#EF4444' }}>
+              <Typography variant="h4" sx={{ fontWeight: 900, color: themeColors.accentSecondary }}>
+                {acceptedCount}
+              </Typography>
+              <Typography variant="caption" sx={{ color: themeColors.textSecondary }}>Scheduled for Evaluation</Typography>
+            </Paper>
+          </Grid>
+
+          <Grid item xs={6} sm={3}>
+            <Paper sx={{ p: 2.2, borderRadius: '18px', bgcolor: themeColors.bgPaper, border: `1px solid ${themeColors.border}` }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: '#F44336', mb: 0.5 }}>
+                <WarningAmberIcon sx={{ fontSize: 18 }} />
+                <Typography variant="caption" sx={{ fontWeight: 800, textTransform: 'uppercase' }}>Urgent Escalations</Typography>
+              </Box>
+              <Typography variant="h4" sx={{ fontWeight: 900, color: '#F44336' }}>
                 {urgentCount}
               </Typography>
-              <Typography variant="caption" sx={{ color: '#94A8A3' }}>High-Acuity Referrals</Typography>
+              <Typography variant="caption" sx={{ color: '#F44336' }}>High Priority Patients</Typography>
             </Paper>
           </Grid>
 
           <Grid item xs={6} sm={3}>
-            <Paper sx={{ p: 2.2, borderRadius: '18px', bgcolor: '#131F22', border: '1px solid rgba(76, 175, 80, 0.25)' }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: '#4CAF50', mb: 0.5 }}>
-                <AssignmentTurnedInIcon sx={{ fontSize: 18 }} />
-                <Typography variant="caption" sx={{ fontWeight: 800, textTransform: 'uppercase' }}>Accepted &amp; Completed</Typography>
+            <Paper sx={{ p: 2.2, borderRadius: '18px', bgcolor: themeColors.bgPaper, border: `1px solid ${themeColors.border}` }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: isLight ? '#059669' : '#4CAF50', mb: 0.5 }}>
+                <MedicalServicesIcon sx={{ fontSize: 18 }} />
+                <Typography variant="caption" sx={{ fontWeight: 800, textTransform: 'uppercase' }}>Completed Handoffs</Typography>
               </Box>
-              <Typography variant="h4" sx={{ fontWeight: 900, color: '#4CAF50' }}>
+              <Typography variant="h4" sx={{ fontWeight: 900, color: isLight ? '#059669' : '#4CAF50' }}>
                 {completedTransfers}
               </Typography>
-              <Typography variant="caption" sx={{ color: '#94A8A3' }}>Successful Handoffs</Typography>
+              <Typography variant="caption" sx={{ color: themeColors.textSecondary }}>Successful Handoffs</Typography>
             </Paper>
           </Grid>
         </Grid>
 
         {/* Filter & Search Bar */}
-        <Paper sx={{ p: 2.5, mb: 3.5, borderRadius: '20px', bgcolor: '#131F22', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
+        <Paper sx={{ p: 2.5, mb: 3.5, borderRadius: '20px', bgcolor: themeColors.bgPaper, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2, border: `1px solid ${themeColors.border}` }}>
           <Box sx={{ flex: 1, minWidth: 280 }}>
             <TextField
               fullWidth
@@ -217,17 +215,17 @@ export default function ReferralsOversight() {
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
-                    <SearchIcon sx={{ color: '#94A8A3' }} />
+                    <SearchIcon sx={{ color: themeColors.textSecondary }} />
                   </InputAdornment>
                 )
               }}
               sx={{
                 '& .MuiOutlinedInput-root': {
-                  color: '#EBF5F3',
-                  bgcolor: 'rgba(255,255,255,0.03)',
+                  color: themeColors.textPrimary,
+                  bgcolor: isLight ? '#FAF8F5' : 'rgba(255,255,255,0.03)',
                   borderRadius: '14px',
-                  '& fieldset': { borderColor: 'rgba(255, 255, 255, 0.1)' },
-                  '&:hover fieldset': { borderColor: '#00C896' }
+                  '& fieldset': { borderColor: isLight ? 'rgba(45, 80, 60, 0.18)' : 'rgba(255, 255, 255, 0.1)' },
+                  '&:hover fieldset': { borderColor: themeColors.accentSecondary }
                 }
               }}
             />
@@ -246,12 +244,12 @@ export default function ReferralsOversight() {
                 label={f.label}
                 onClick={() => setStatusFilter(f.id)}
                 sx={{
-                  bgcolor: statusFilter === f.id ? '#00C896' : 'rgba(255,255,255,0.05)',
-                  color: statusFilter === f.id ? '#0B1315' : '#94A8A3',
+                  bgcolor: statusFilter === f.id ? themeColors.accentSecondary : (isLight ? '#EBE5D8' : 'rgba(255,255,255,0.05)'),
+                  color: statusFilter === f.id ? '#FFFFFF' : themeColors.textPrimary,
                   fontWeight: 800,
                   fontSize: '0.74rem',
                   cursor: 'pointer',
-                  border: statusFilter === f.id ? '1px solid #00C896' : '1px solid rgba(255,255,255,0.08)'
+                  border: statusFilter === f.id ? `1px solid ${themeColors.accentSecondary}` : `1px solid ${themeColors.border}`
                 }}
               />
             ))}
@@ -259,45 +257,45 @@ export default function ReferralsOversight() {
         </Paper>
 
         {/* Referrals Table */}
-        <Paper sx={{ bgcolor: '#131F22', borderRadius: '18px', border: '1px solid rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+        <Paper sx={{ bgcolor: themeColors.bgPaper, borderRadius: '18px', border: `1px solid ${themeColors.border}`, overflow: 'hidden' }}>
           {loading ? (
             <Box sx={{ p: 6, display: 'flex', justifyContent: 'center' }}>
-              <CircularProgress sx={{ color: '#00C896' }} />
+              <CircularProgress sx={{ color: themeColors.accentSecondary }} />
             </Box>
           ) : (
             <TableContainer>
               <Table>
-                <TableHead sx={{ bgcolor: '#0B1315' }}>
+                <TableHead sx={{ bgcolor: isLight ? '#EBE5D8' : '#0E1719' }}>
                   <TableRow>
-                    <TableCell sx={{ color: '#94A8A3', fontWeight: 800 }}>Referral #</TableCell>
-                    <TableCell sx={{ color: '#94A8A3', fontWeight: 800 }}>Referring Doctor</TableCell>
-                    <TableCell sx={{ color: '#94A8A3', fontWeight: 800 }}>Target Specialist</TableCell>
-                    <TableCell sx={{ color: '#94A8A3', fontWeight: 800 }}>Patient</TableCell>
-                    <TableCell sx={{ color: '#94A8A3', fontWeight: 800 }}>Clinical Reason</TableCell>
-                    <TableCell sx={{ color: '#94A8A3', fontWeight: 800 }}>Priority</TableCell>
-                    <TableCell sx={{ color: '#94A8A3', fontWeight: 800 }}>Status</TableCell>
-                    <TableCell align="right" sx={{ color: '#94A8A3', fontWeight: 800 }}>Action</TableCell>
+                    <TableCell sx={{ color: themeColors.textSecondary, fontWeight: 800 }}>Referral #</TableCell>
+                    <TableCell sx={{ color: themeColors.textSecondary, fontWeight: 800 }}>Referring Doctor</TableCell>
+                    <TableCell sx={{ color: themeColors.textSecondary, fontWeight: 800 }}>Target Specialist</TableCell>
+                    <TableCell sx={{ color: themeColors.textSecondary, fontWeight: 800 }}>Patient</TableCell>
+                    <TableCell sx={{ color: themeColors.textSecondary, fontWeight: 800 }}>Clinical Reason</TableCell>
+                    <TableCell sx={{ color: themeColors.textSecondary, fontWeight: 800 }}>Priority</TableCell>
+                    <TableCell sx={{ color: themeColors.textSecondary, fontWeight: 800 }}>Status</TableCell>
+                    <TableCell align="right" sx={{ color: themeColors.textSecondary, fontWeight: 800 }}>Action</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {filteredReferrals.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={8} sx={{ textAlign: 'center', py: 5, color: '#94A8A3' }}>
+                      <TableCell colSpan={8} sx={{ textAlign: 'center', py: 5, color: themeColors.textSecondary }}>
                         No referrals found under selected filter.
                       </TableCell>
                     </TableRow>
                   ) : (
                     filteredReferrals.map((r: any) => (
-                      <TableRow key={r.id} sx={{ '&:hover': { bgcolor: 'rgba(255,255,255,0.02)' } }}>
-                        <TableCell sx={{ color: '#00C896', fontWeight: 700, fontFamily: 'monospace' }}>
+                      <TableRow key={r.id} sx={{ '& td': { borderColor: themeColors.border, color: themeColors.textPrimary } }}>
+                        <TableCell sx={{ color: themeColors.accentPrimary, fontWeight: 700, fontFamily: 'monospace' }}>
                           {r.referralNumber}
                         </TableCell>
                         <TableCell>
                           <Box
                             onClick={() => setSelectedUser({ id: r.referringDoctorId, firstName: r.referringDoctorFirstName, lastName: r.referringDoctorLastName, role: 'doctor' })}
-                            sx={{ cursor: 'pointer', display: 'inline-block', '&:hover': { color: '#00C896' } }}
+                            sx={{ cursor: 'pointer', display: 'inline-block', '&:hover': { color: themeColors.accentPrimary } }}
                           >
-                            <Typography variant="body2" sx={{ fontWeight: 700, color: '#EBF5F3' }}>
+                            <Typography variant="body2" sx={{ fontWeight: 700, color: themeColors.textPrimary }}>
                               Dr. {r.referringDoctorFirstName} {r.referringDoctorLastName}
                             </Typography>
                           </Box>
@@ -305,9 +303,9 @@ export default function ReferralsOversight() {
                         <TableCell>
                           <Box
                             onClick={() => setSelectedUser({ id: r.referredDoctorId, firstName: r.referredDoctorFirstName, lastName: r.referredDoctorLastName, role: 'doctor' })}
-                            sx={{ cursor: 'pointer', display: 'inline-block', '&:hover': { color: '#38BDF8' } }}
+                            sx={{ cursor: 'pointer', display: 'inline-block', '&:hover': { color: themeColors.accentSecondary } }}
                           >
-                            <Typography variant="body2" sx={{ fontWeight: 700, color: '#38BDF8' }}>
+                            <Typography variant="body2" sx={{ fontWeight: 700, color: themeColors.accentSecondary }}>
                               Dr. {r.referredDoctorFirstName} {r.referredDoctorLastName}
                             </Typography>
                           </Box>
@@ -315,15 +313,15 @@ export default function ReferralsOversight() {
                         <TableCell>
                           <Box
                             onClick={() => setSelectedUser({ id: r.patientId, firstName: r.patientFirstName, lastName: r.patientLastName, role: 'patient' })}
-                            sx={{ cursor: 'pointer', display: 'inline-block', '&:hover': { color: '#60A5FA' } }}
+                            sx={{ cursor: 'pointer', display: 'inline-block', '&:hover': { color: themeColors.accentSecondary } }}
                           >
-                            <Typography variant="body2" sx={{ fontWeight: 700, color: '#EBF5F3' }}>
+                            <Typography variant="body2" sx={{ fontWeight: 700, color: themeColors.textPrimary }}>
                               {r.patientFirstName} {r.patientLastName}
                             </Typography>
                           </Box>
                         </TableCell>
-                        <TableCell sx={{ color: '#94A8A3', maxWidth: 220 }}>
-                          <Typography variant="body2" noWrap sx={{ color: '#EBF5F3', fontWeight: 600 }}>
+                        <TableCell sx={{ color: themeColors.textSecondary, maxWidth: 220 }}>
+                          <Typography variant="body2" noWrap sx={{ color: themeColors.textPrimary, fontWeight: 600 }}>
                             {r.reason || 'Specialist Consultation'}
                           </Typography>
                         </TableCell>
@@ -332,8 +330,8 @@ export default function ReferralsOversight() {
                             label={r.priority?.toUpperCase() || 'ROUTINE'}
                             size="small"
                             sx={{
-                              bgcolor: r.priority === 'urgent' ? 'rgba(244,67,54,0.15)' : 'rgba(255,255,255,0.05)',
-                              color: r.priority === 'urgent' ? '#F44336' : '#94A8A3',
+                              bgcolor: r.priority === 'urgent' ? 'rgba(244,67,54,0.15)' : (isLight ? '#EBE5D8' : 'rgba(255,255,255,0.05)'),
+                              color: r.priority === 'urgent' ? '#F44336' : themeColors.textSecondary,
                               fontSize: '0.68rem',
                               fontWeight: 800
                             }}
@@ -349,10 +347,11 @@ export default function ReferralsOversight() {
                             sx={{
                               borderRadius: '10px',
                               fontWeight: 800,
-                              color: '#00C896',
-                              borderColor: 'rgba(0, 200, 150, 0.4)',
+                              color: themeColors.accentPrimary,
+                              borderColor: isLight ? 'rgba(0,143,104,0.4)' : 'rgba(0, 200, 150, 0.4)',
                               textTransform: 'none',
-                              '&:hover': { bgcolor: 'rgba(0, 200, 150, 0.15)', borderColor: '#00C896' }
+                              fontSize: '0.75rem',
+                              '&:hover': { bgcolor: isLight ? 'rgba(0,143,104,0.1)' : 'rgba(0, 200, 150, 0.15)', borderColor: themeColors.accentPrimary }
                             }}
                           >
                             Inspect &amp; Triage
@@ -374,18 +373,18 @@ export default function ReferralsOversight() {
         onClose={() => setSelectedReferral(null)}
         maxWidth="sm"
         fullWidth
-        PaperProps={{ sx: { bgcolor: '#131F22', color: '#EBF5F3', borderRadius: '20px', border: '1px solid rgba(0,200,150,0.3)' } }}
+        PaperProps={{ sx: { bgcolor: themeColors.bgPaper, color: themeColors.textPrimary, borderRadius: '20px', border: `1px solid ${themeColors.border}` } }}
       >
         {selectedReferral && (
           <form onSubmit={handleSaveReferral}>
-            <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+            <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: `1px solid ${themeColors.border}` }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2 }}>
-                <MedicalServicesIcon sx={{ color: '#00C896' }} />
-                <Typography variant="h6" sx={{ fontWeight: 900 }}>
+                <MedicalServicesIcon sx={{ color: themeColors.accentPrimary }} />
+                <Typography variant="h6" sx={{ fontWeight: 900, color: themeColors.textPrimary }}>
                   Clinical Referral #{selectedReferral.referralNumber}
                 </Typography>
               </Box>
-              <IconButton onClick={() => setSelectedReferral(null)} sx={{ color: '#94A8A3' }}>
+              <IconButton onClick={() => setSelectedReferral(null)} sx={{ color: themeColors.textSecondary }}>
                 <CloseIcon />
               </IconButton>
             </DialogTitle>
@@ -394,17 +393,17 @@ export default function ReferralsOversight() {
               {/* Doctor Network Strip */}
               <Grid container spacing={2}>
                 <Grid item xs={6}>
-                  <Paper sx={{ p: 1.5, borderRadius: '12px', bgcolor: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                    <Typography variant="caption" sx={{ color: '#94A8A3' }}>REFERRING DOCTOR</Typography>
-                    <Typography variant="subtitle2" sx={{ color: '#EBF5F3', fontWeight: 800 }}>
+                  <Paper sx={{ p: 1.5, borderRadius: '12px', bgcolor: isLight ? '#FAF8F5' : 'rgba(255,255,255,0.03)', border: `1px solid ${themeColors.border}` }}>
+                    <Typography variant="caption" sx={{ color: themeColors.textSecondary }}>REFERRING DOCTOR</Typography>
+                    <Typography variant="subtitle2" sx={{ color: themeColors.textPrimary, fontWeight: 800 }}>
                       Dr. {selectedReferral.referringDoctorFirstName} {selectedReferral.referringDoctorLastName}
                     </Typography>
                   </Paper>
                 </Grid>
                 <Grid item xs={6}>
-                  <Paper sx={{ p: 1.5, borderRadius: '12px', bgcolor: 'rgba(0,200,150,0.04)', border: '1px solid rgba(0,200,150,0.2)' }}>
-                    <Typography variant="caption" sx={{ color: '#00C896' }}>TARGET SPECIALIST</Typography>
-                    <Typography variant="subtitle2" sx={{ color: '#00C896', fontWeight: 800 }}>
+                  <Paper sx={{ p: 1.5, borderRadius: '12px', bgcolor: isLight ? 'rgba(0, 143, 104, 0.08)' : 'rgba(0,200,150,0.04)', border: isLight ? '1px solid rgba(0, 143, 104, 0.25)' : '1px solid rgba(0,200,150,0.2)' }}>
+                    <Typography variant="caption" sx={{ color: themeColors.accentPrimary }}>TARGET SPECIALIST</Typography>
+                    <Typography variant="subtitle2" sx={{ color: themeColors.accentPrimary, fontWeight: 800 }}>
                       Dr. {selectedReferral.referredDoctorFirstName} {selectedReferral.referredDoctorLastName}
                     </Typography>
                   </Paper>
@@ -412,12 +411,12 @@ export default function ReferralsOversight() {
               </Grid>
 
               {/* Patient Profile */}
-              <Paper sx={{ p: 2, borderRadius: '12px', bgcolor: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                <Typography variant="caption" sx={{ color: '#94A8A3' }}>PATIENT</Typography>
-                <Typography variant="body1" sx={{ color: '#EBF5F3', fontWeight: 800 }}>
+              <Paper sx={{ p: 2, borderRadius: '12px', bgcolor: isLight ? '#FAF8F5' : 'rgba(255,255,255,0.03)', border: `1px solid ${themeColors.border}` }}>
+                <Typography variant="caption" sx={{ color: themeColors.textSecondary }}>PATIENT</Typography>
+                <Typography variant="body1" sx={{ color: themeColors.textPrimary, fontWeight: 800 }}>
                   {selectedReferral.patientFirstName} {selectedReferral.patientLastName}
                 </Typography>
-                <Typography variant="caption" sx={{ color: '#38BDF8', display: 'block', mt: 0.5 }}>
+                <Typography variant="caption" sx={{ color: themeColors.accentSecondary, display: 'block', mt: 0.5 }}>
                   Clinical Reason: {selectedReferral.reason || 'Specialist Evaluation'}
                 </Typography>
               </Paper>
@@ -425,9 +424,9 @@ export default function ReferralsOversight() {
               {/* Clinical Summary */}
               {selectedReferral.clinicalSummary && (
                 <Box>
-                  <Typography variant="caption" sx={{ color: '#94A8A3' }}>Clinical Diagnostic Summary:</Typography>
-                  <Paper sx={{ p: 1.5, borderRadius: '10px', bgcolor: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', mt: 0.5 }}>
-                    <Typography variant="body2" sx={{ color: '#EBF5F3' }}>
+                  <Typography variant="caption" sx={{ color: themeColors.textSecondary }}>Clinical Diagnostic Summary:</Typography>
+                  <Paper sx={{ p: 1.5, borderRadius: '10px', bgcolor: isLight ? '#FAF8F5' : 'rgba(255,255,255,0.03)', border: `1px solid ${themeColors.border}`, mt: 0.5 }}>
+                    <Typography variant="body2" sx={{ color: themeColors.textPrimary }}>
                       {selectedReferral.clinicalSummary}
                     </Typography>
                   </Paper>
@@ -436,16 +435,15 @@ export default function ReferralsOversight() {
 
               {/* Status Select */}
               <FormControl fullWidth>
-                <InputLabel sx={{ color: '#94A8A3' }}>Referral Status</InputLabel>
+                <InputLabel sx={{ color: themeColors.textSecondary }}>Referral Status</InputLabel>
                 <Select
                   value={newStatus}
                   onChange={(e) => setNewStatus(e.target.value)}
                   label="Referral Status"
                   sx={{
-                    bgcolor: 'rgba(255,255,255,0.03)',
-                    color: '#EBF5F3',
-                    borderRadius: '12px',
-                    '& fieldset': { borderColor: 'rgba(255,255,255,0.15)' }
+                    bgcolor: isLight ? '#FAF8F5' : 'rgba(255,255,255,0.03)',
+                    color: themeColors.textPrimary,
+                    borderRadius: '12px'
                   }}
                 >
                   <MenuItem value="pending">Pending (Awaiting Specialist)</MenuItem>
@@ -464,27 +462,26 @@ export default function ReferralsOversight() {
                 label="Specialist Triage / Response Notes"
                 value={responseNotes}
                 onChange={(e) => setResponseNotes(e.target.value)}
-                InputLabelProps={{ sx: { color: '#94A8A3' } }}
+                InputLabelProps={{ sx: { color: themeColors.textSecondary } }}
                 sx={{
                   '& .MuiOutlinedInput-root': {
-                    color: '#EBF5F3',
-                    bgcolor: 'rgba(255,255,255,0.03)',
-                    borderRadius: '12px',
-                    '& fieldset': { borderColor: 'rgba(255,255,255,0.15)' }
+                    color: themeColors.textPrimary,
+                    bgcolor: isLight ? '#FAF8F5' : 'rgba(255,255,255,0.03)',
+                    borderRadius: '12px'
                   }
                 }}
               />
             </DialogContent>
 
-            <DialogActions sx={{ p: 2.5, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-              <Button onClick={() => setSelectedReferral(null)} sx={{ color: '#94A8A3' }}>
+            <DialogActions sx={{ p: 2.5, borderTop: `1px solid ${themeColors.border}` }}>
+              <Button onClick={() => setSelectedReferral(null)} sx={{ color: themeColors.textSecondary }}>
                 Cancel
               </Button>
               <Button
                 type="submit"
                 variant="contained"
                 disabled={actionLoading}
-                sx={{ bgcolor: '#00C896', color: '#0B1315', fontWeight: 800, borderRadius: '10px' }}
+                sx={{ bgcolor: themeColors.accentPrimary, color: isLight ? '#FFFFFF' : '#0B1315', fontWeight: 800, borderRadius: '10px', '&:hover': { bgcolor: isLight ? '#007A5A' : '#00A87E' } }}
               >
                 {actionLoading ? <CircularProgress size={20} /> : 'Save Referral Triage'}
               </Button>

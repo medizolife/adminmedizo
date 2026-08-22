@@ -28,9 +28,11 @@ import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import AdminLayout from '@/components/AdminLayout';
 import UserDetailModal from '@/components/UserDetailModal';
 import { useAdminData } from '@/context/AdminDataContext';
+import { useAppTheme } from '@/context/ThemeContext';
 
 export default function PatientsRoster() {
   const { patients, isPreloaded, isSyncing, refreshSection, toggleUserStatusLocal, deleteUserLocal } = useAdminData();
+  const { isLight, themeColors } = useAppTheme();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedPatient, setSelectedPatient] = useState<any>(null);
@@ -93,10 +95,10 @@ export default function PatientsRoster() {
     <AdminLayout>
       <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
         <Box>
-          <Typography variant="h4" sx={{ fontWeight: 900, color: '#EBF5F3', display: 'flex', alignItems: 'center', gap: 1.5 }}>
-            <PeopleIcon sx={{ color: '#3B82F6', fontSize: 32 }} /> Patients Roster & Records
+          <Typography variant="h4" sx={{ fontWeight: 900, color: themeColors.textPrimary, display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            <PeopleIcon sx={{ color: themeColors.accentSecondary, fontSize: 32 }} /> Patients Roster &amp; Records
           </Typography>
-          <Typography variant="body2" sx={{ color: '#94A8A3', mt: 0.5 }}>
+          <Typography variant="body2" sx={{ color: themeColors.textSecondary, mt: 0.5 }}>
             Monitor registered patients, prescription histories, and manage account activation status
           </Typography>
         </Box>
@@ -104,40 +106,40 @@ export default function PatientsRoster() {
           variant="outlined"
           onClick={() => refreshSection('patients')}
           startIcon={<RefreshIcon sx={{ animation: isSyncing ? 'spin 1s linear infinite' : 'none' }} />}
-          sx={{ borderRadius: '12px', borderColor: 'rgba(59, 130, 246, 0.3)', color: '#3B82F6', fontWeight: 700 }}
+          sx={{ borderRadius: '12px', borderColor: isLight ? 'rgba(2, 132, 199, 0.4)' : 'rgba(59, 130, 246, 0.3)', color: themeColors.accentSecondary, fontWeight: 700 }}
         >
           Refresh Roster
         </Button>
       </Box>
 
       {toastMessage && (
-        <Alert severity="success" onClose={() => setToastMessage('')} sx={{ mb: 3, borderRadius: '12px', bgcolor: 'rgba(16, 185, 129, 0.15)', color: '#34D399' }}>
+        <Alert severity="success" onClose={() => setToastMessage('')} sx={{ mb: 3, borderRadius: '12px', bgcolor: 'rgba(16, 185, 129, 0.15)', color: isLight ? '#065F46' : '#34D399' }}>
           {toastMessage}
         </Alert>
       )}
 
       {/* Filter & Search Bar */}
-      <Paper sx={{ p: 2.5, mb: 4, borderRadius: '20px', bgcolor: '#131F22', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
+      <Paper sx={{ p: 2.5, mb: 4, borderRadius: '20px', bgcolor: themeColors.bgPaper, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2, border: `1px solid ${themeColors.border}` }}>
         <Box sx={{ flex: 1, minWidth: 280 }}>
           <TextField
             fullWidth
-            placeholder="Search patients by name, email, or phone..."
+            placeholder="Search patients by name, email, or phone number..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
-                  <SearchIcon sx={{ color: '#94A8A3' }} />
+                  <SearchIcon sx={{ color: themeColors.textSecondary }} />
                 </InputAdornment>
               )
             }}
             sx={{
               '& .MuiOutlinedInput-root': {
-                color: '#EBF5F3',
-                bgcolor: 'rgba(255,255,255,0.03)',
+                color: themeColors.textPrimary,
+                bgcolor: isLight ? '#FAF8F5' : 'rgba(255,255,255,0.03)',
                 borderRadius: '14px',
-                '& fieldset': { borderColor: 'rgba(255, 255, 255, 0.1)' },
-                '&:hover fieldset': { borderColor: '#3B82F6' }
+                '& fieldset': { borderColor: isLight ? 'rgba(45, 80, 60, 0.18)' : 'rgba(255, 255, 255, 0.1)' },
+                '&:hover fieldset': { borderColor: themeColors.accentSecondary }
               }
             }}
           />
@@ -148,8 +150,8 @@ export default function PatientsRoster() {
             label="All Status"
             onClick={() => setStatusFilter('all')}
             sx={{
-              bgcolor: statusFilter === 'all' ? '#3B82F6' : 'rgba(255,255,255,0.05)',
-              color: statusFilter === 'all' ? '#ffffff' : '#EBF5F3',
+              bgcolor: statusFilter === 'all' ? themeColors.accentSecondary : (isLight ? '#EBE5D8' : 'rgba(255,255,255,0.05)'),
+              color: statusFilter === 'all' ? '#FFFFFF' : themeColors.textPrimary,
               fontWeight: 800,
               cursor: 'pointer'
             }}
@@ -158,8 +160,8 @@ export default function PatientsRoster() {
             label="Active Only"
             onClick={() => setStatusFilter('active')}
             sx={{
-              bgcolor: statusFilter === 'active' ? '#10B981' : 'rgba(255,255,255,0.05)',
-              color: statusFilter === 'active' ? '#0B1315' : '#EBF5F3',
+              bgcolor: statusFilter === 'active' ? '#10B981' : (isLight ? '#EBE5D8' : 'rgba(255,255,255,0.05)'),
+              color: statusFilter === 'active' ? '#ffffff' : themeColors.textPrimary,
               fontWeight: 800,
               cursor: 'pointer'
             }}
@@ -168,8 +170,8 @@ export default function PatientsRoster() {
             label="Deactivated"
             onClick={() => setStatusFilter('deactivated')}
             sx={{
-              bgcolor: statusFilter === 'deactivated' ? '#EF4444' : 'rgba(255,255,255,0.05)',
-              color: statusFilter === 'deactivated' ? '#ffffff' : '#EBF5F3',
+              bgcolor: statusFilter === 'deactivated' ? '#EF4444' : (isLight ? '#EBE5D8' : 'rgba(255,255,255,0.05)'),
+              color: statusFilter === 'deactivated' ? '#ffffff' : themeColors.textPrimary,
               fontWeight: 800,
               cursor: 'pointer'
             }}
@@ -178,15 +180,15 @@ export default function PatientsRoster() {
       </Paper>
 
       {/* Patients Table */}
-      <Paper sx={{ borderRadius: '20px', bgcolor: '#131F22', overflow: 'hidden' }}>
+      <Paper sx={{ borderRadius: '20px', bgcolor: themeColors.bgPaper, overflow: 'hidden', border: `1px solid ${themeColors.border}` }}>
         <TableContainer>
           <Table>
             <TableHead>
-              <TableRow sx={{ '& th': { borderColor: 'rgba(255,255,255,0.08)', color: '#94A8A3', fontWeight: 700 } }}>
-                <TableCell>Patient Name</TableCell>
-                <TableCell>Contact & Gender</TableCell>
+              <TableRow sx={{ '& th': { borderColor: themeColors.border, color: themeColors.textSecondary, fontWeight: 700, bgcolor: isLight ? '#EBE5D8' : '#0E1719' } }}>
+                <TableCell>Patient Name &amp; Contact</TableCell>
+                <TableCell>Phone &amp; Bio</TableCell>
                 <TableCell>Blood Group</TableCell>
-                <TableCell>Prescriptions Rx</TableCell>
+                <TableCell>Prescriptions Issued</TableCell>
                 <TableCell>Account Status</TableCell>
                 <TableCell align="right">Actions</TableCell>
               </TableRow>
@@ -200,7 +202,7 @@ export default function PatientsRoster() {
                 </TableRow>
               ) : filteredPatients.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} align="center" sx={{ py: 6, color: '#94A8A3' }}>
+                  <TableCell colSpan={6} align="center" sx={{ py: 6, color: themeColors.textSecondary }}>
                     No patients found matching criteria.
                   </TableCell>
                 </TableRow>
@@ -208,30 +210,30 @@ export default function PatientsRoster() {
                 filteredPatients.map((pat) => {
                   const isDeactivated = pat.status === 'deactivated';
                   return (
-                    <TableRow key={pat.id || pat._id} sx={{ '& td': { borderColor: 'rgba(255,255,255,0.06)', color: '#EBF5F3' } }}>
+                    <TableRow key={pat.id || pat._id} sx={{ '& td': { borderColor: themeColors.border, color: themeColors.textPrimary } }}>
                       <TableCell>
                         <Box
                           onClick={() => setSelectedPatient(pat)}
                           sx={{ display: 'flex', alignItems: 'center', gap: 1.5, cursor: 'pointer', '&:hover': { opacity: 0.85 } }}
                         >
-                          <Avatar sx={{ bgcolor: isDeactivated ? '#4B5563' : '#3B82F6', color: '#ffffff', fontWeight: 800 }}>
+                          <Avatar sx={{ bgcolor: isDeactivated ? '#4B5563' : themeColors.accentSecondary, color: '#ffffff', fontWeight: 800 }}>
                             {pat.firstName?.[0] || 'P'}
                           </Avatar>
                           <Box>
-                            <Typography variant="subtitle2" sx={{ fontWeight: 800, color: isDeactivated ? '#94A8A3' : '#EBF5F3' }}>
+                            <Typography variant="subtitle2" sx={{ fontWeight: 800, color: isDeactivated ? themeColors.textSecondary : themeColors.textPrimary }}>
                               {pat.firstName} {pat.lastName}
                             </Typography>
-                            <Typography variant="caption" sx={{ color: '#94A8A3' }}>
+                            <Typography variant="caption" sx={{ color: themeColors.textSecondary }}>
                               {pat.email}
                             </Typography>
                           </Box>
                         </Box>
                       </TableCell>
                       <TableCell>
-                        <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                        <Typography variant="body2" sx={{ fontWeight: 700, color: themeColors.textPrimary }}>
                           {pat.phone || 'No phone'}
                         </Typography>
-                        <Typography variant="caption" sx={{ color: '#94A8A3', textTransform: 'capitalize' }}>
+                        <Typography variant="caption" sx={{ color: themeColors.textSecondary, textTransform: 'capitalize' }}>
                           {pat.gender || 'N/A'} {pat.dateOfBirth ? `(DOB: ${pat.dateOfBirth})` : ''}
                         </Typography>
                       </TableCell>
@@ -239,10 +241,10 @@ export default function PatientsRoster() {
                         <Chip
                           label={pat.bloodType || 'Unknown'}
                           size="small"
-                          sx={{ bgcolor: 'rgba(239, 68, 68, 0.15)', color: '#F87171', fontWeight: 800, fontSize: '0.7rem' }}
+                          sx={{ bgcolor: 'rgba(239, 68, 68, 0.15)', color: '#EF4444', fontWeight: 800, fontSize: '0.7rem' }}
                         />
                       </TableCell>
-                      <TableCell sx={{ fontWeight: 800, color: '#60A5FA' }}>
+                      <TableCell sx={{ fontWeight: 800, color: isLight ? '#0284C7' : '#60A5FA' }}>
                         {pat.prescriptionCount || 0} Records
                       </TableCell>
                       <TableCell>
@@ -251,7 +253,7 @@ export default function PatientsRoster() {
                           size="small"
                           sx={{
                             bgcolor: isDeactivated ? 'rgba(239, 68, 68, 0.15)' : 'rgba(16, 185, 129, 0.15)',
-                            color: isDeactivated ? '#EF4444' : '#10B981',
+                            color: isDeactivated ? '#EF4444' : (isLight ? '#059669' : '#10B981'),
                             fontWeight: 900,
                             fontSize: '0.72rem'
                           }}
@@ -267,9 +269,10 @@ export default function PatientsRoster() {
                             sx={{
                               borderRadius: '10px',
                               fontWeight: 800,
-                              color: '#3B82F6',
-                              borderColor: 'rgba(59, 130, 246, 0.4)',
-                              '&:hover': { bgcolor: 'rgba(59, 130, 246, 0.15)', borderColor: '#3B82F6' }
+                              color: themeColors.accentSecondary,
+                              borderColor: isLight ? 'rgba(2, 132, 199, 0.4)' : 'rgba(59, 130, 246, 0.4)',
+                              fontSize: '0.75rem',
+                              '&:hover': { bgcolor: isLight ? 'rgba(2, 132, 199, 0.1)' : 'rgba(59, 130, 246, 0.15)', borderColor: themeColors.accentSecondary }
                             }}
                           >
                             Analytics &amp; Profile
@@ -280,7 +283,7 @@ export default function PatientsRoster() {
                             size="small"
                             onClick={() => handleToggleStatus(pat)}
                             startIcon={isDeactivated ? <CheckCircleIcon /> : <BlockIcon />}
-                            sx={{ borderRadius: '10px', fontWeight: 800 }}
+                            sx={{ borderRadius: '10px', fontWeight: 800, fontSize: '0.75rem' }}
                           >
                             {isDeactivated ? 'Activate' : 'Deactivate'}
                           </Button>
@@ -290,7 +293,7 @@ export default function PatientsRoster() {
                             size="small"
                             onClick={() => handleDeleteUser(pat)}
                             startIcon={<DeleteIcon />}
-                            sx={{ borderRadius: '10px', fontWeight: 800, bgcolor: '#DC2626', '&:hover': { bgcolor: '#B91C1C' } }}
+                            sx={{ borderRadius: '10px', fontWeight: 800, fontSize: '0.75rem', bgcolor: '#DC2626', '&:hover': { bgcolor: '#B91C1C' } }}
                           >
                             Delete
                           </Button>

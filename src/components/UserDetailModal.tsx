@@ -134,6 +134,7 @@ const formatSafeStr = (val: any, fallback: string = ''): string => {
 interface UserDetailModalProps {
   open: boolean;
   userId: string | null;
+  userRole?: string;
   initialUserData?: any;
   onClose: () => void;
   onUserUpdated?: () => void;

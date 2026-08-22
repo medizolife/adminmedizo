@@ -39,9 +39,11 @@ import PersonPinIcon from '@mui/icons-material/PersonPin';
 import AdminLayout from '@/components/AdminLayout';
 import UserDetailModal from '@/components/UserDetailModal';
 import { useAdminData } from '@/context/AdminDataContext';
+import { useAppTheme } from '@/context/ThemeContext';
 
 export default function HomeCareOversight() {
   const { homeCare, nurses, isPreloaded, isSyncing, refreshSection, updateHomeCareStatusLocal, assignNurseToHomeCareLocal } = useAdminData();
+  const { isLight, themeColors } = useAppTheme();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedUser, setSelectedUser] = useState<any>(null);
@@ -62,28 +64,27 @@ export default function HomeCareOversight() {
     }
     if (search.trim()) {
       const q = search.toLowerCase();
-      const match =
-        (r.requestNumber && r.requestNumber.toLowerCase().includes(q)) ||
-        (r.patientFirstName && r.patientFirstName.toLowerCase().includes(q)) ||
-        (r.patientLastName && r.patientLastName.toLowerCase().includes(q)) ||
-        (r.nurseFirstName && r.nurseFirstName.toLowerCase().includes(q)) ||
-        (r.nurseLastName && r.nurseLastName.toLowerCase().includes(q)) ||
-        (r.serviceType && r.serviceType.toLowerCase().includes(q)) ||
-        (r.address && r.address.toLowerCase().includes(q));
-      if (!match) return false;
+      return (
+        String(r.requestNumber || '').toLowerCase().includes(q) ||
+        String(r.patientFirstName || '').toLowerCase().includes(q) ||
+        String(r.patientLastName || '').toLowerCase().includes(q) ||
+        String(r.nurseFirstName || '').toLowerCase().includes(q) ||
+        String(r.nurseLastName || '').toLowerCase().includes(q) ||
+        String(r.serviceType || '').toLowerCase().includes(q) ||
+        String(r.address || '').toLowerCase().includes(q)
+      );
     }
     return true;
   });
 
-  // KPI Metrics Calculation
-  const totalCount = requests.length;
-  const pendingCount = requests.filter((r: any) => r.status === 'requested' || r.status === 'approved').length;
-  const inProgressCount = requests.filter((r: any) => r.status === 'assigned' || r.status === 'in_progress').length;
+  const requestedCount = requests.filter((r: any) => r.status === 'requested').length;
+  const assignedCount = requests.filter((r: any) => r.status === 'assigned' || r.status === 'approved').length;
+  const inProgressCount = requests.filter((r: any) => r.status === 'in_progress').length;
   const completedCount = requests.filter((r: any) => r.status === 'completed').length;
 
   const handleOpenDispatch = (req: any) => {
     setActiveRequest(req);
-    setSelectedNurseId(req.assignedNurseId || req.nurseId || '');
+    setSelectedNurseId(req.assignedNurseId || '');
     setSelectedStatus(req.status || 'requested');
     setDispatchModalOpen(true);
   };
@@ -92,135 +93,128 @@ export default function HomeCareOversight() {
     e.preventDefault();
     if (!activeRequest) return;
     setActionLoading(true);
-
     try {
-      // 1. If nurse changed/assigned
       if (selectedNurseId && selectedNurseId !== activeRequest.assignedNurseId) {
-        const nurseObj = nurses.find((n: any) => String(n.id) === String(selectedNurseId));
-        await assignNurseToHomeCareLocal(activeRequest.id, selectedNurseId, nurseObj);
+        const foundNurse = nurses.find((n: any) => (n.id || n._id) === selectedNurseId);
+        await assignNurseToHomeCareLocal(activeRequest.id, selectedNurseId, foundNurse);
       }
-
-      // 2. If status updated
       if (selectedStatus && selectedStatus !== activeRequest.status) {
         await updateHomeCareStatusLocal(activeRequest.id, selectedStatus);
       }
-
-      setToastMessage(`✅ Request #${activeRequest.requestNumber} updated successfully!`);
+      setToastMessage(`Home care request #${activeRequest.requestNumber} updated successfully!`);
       setDispatchModalOpen(false);
-    } catch (err: any) {
-      console.error('Error updating dispatch:', err);
-      alert('Failed to update home care dispatch');
+    } catch (err) {
+      console.error(err);
+      alert('Failed to update home care request.');
     } finally {
       setActionLoading(false);
     }
   };
 
   const getStatusChip = (status: string) => {
-    const map: Record<string, { color: string; bg: string }> = {
-      requested: { color: '#FF9800', bg: 'rgba(255,152,0,0.15)' },
-      approved: { color: '#2196F3', bg: 'rgba(33,150,243,0.15)' },
-      assigned: { color: '#9C27B0', bg: 'rgba(156,39,176,0.15)' },
-      in_progress: { color: '#00BCD4', bg: 'rgba(0,188,212,0.15)' },
-      completed: { color: '#4CAF50', bg: 'rgba(76,175,80,0.15)' },
-      cancelled: { color: '#F44336', bg: 'rgba(244,67,54,0.15)' }
-    };
-    const s = map[status] || { color: '#94A8A3', bg: 'rgba(255,255,255,0.05)' };
-    return (
-      <Chip
-        label={(status || 'requested').toUpperCase()}
-        size="small"
-        sx={{ bgcolor: s.bg, color: s.color, fontWeight: 800, fontSize: '0.72rem' }}
-      />
-    );
+    switch (status) {
+      case 'requested':
+        return <Chip label="Requested" size="small" sx={{ bgcolor: 'rgba(255, 152, 0, 0.15)', color: '#FF9800', fontWeight: 800, fontSize: '0.72rem' }} />;
+      case 'approved':
+      case 'assigned':
+        return <Chip label="Assigned" size="small" sx={{ bgcolor: isLight ? 'rgba(2, 132, 199, 0.12)' : 'rgba(56, 189, 248, 0.15)', color: themeColors.accentSecondary, fontWeight: 800, fontSize: '0.72rem' }} />;
+      case 'in_progress':
+        return <Chip label="In Progress" size="small" sx={{ bgcolor: 'rgba(0, 188, 212, 0.15)', color: '#00BCD4', fontWeight: 800, fontSize: '0.72rem' }} />;
+      case 'completed':
+        return <Chip label="Completed" size="small" sx={{ bgcolor: 'rgba(76, 175, 80, 0.15)', color: isLight ? '#059669' : '#4CAF50', fontWeight: 800, fontSize: '0.72rem' }} />;
+      case 'cancelled':
+        return <Chip label="Cancelled" size="small" sx={{ bgcolor: 'rgba(244, 67, 54, 0.15)', color: '#F44336', fontWeight: 800, fontSize: '0.72rem' }} />;
+      default:
+        return <Chip label={status || 'Unknown'} size="small" sx={{ bgcolor: isLight ? '#EBE5D8' : 'rgba(255, 255, 255, 0.05)', color: themeColors.textSecondary, fontWeight: 800, fontSize: '0.72rem' }} />;
+    }
   };
 
   return (
     <AdminLayout>
-      <Box sx={{ p: { xs: 2, md: 4 } }}>
+      <Box sx={{ mb: 4 }}>
         {/* Header */}
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, flexWrap: 'wrap', gap: 2 }}>
           <Box>
-            <Typography variant="h4" sx={{ fontWeight: 900, color: '#EBF5F3', display: 'flex', alignItems: 'center', gap: 1.5 }}>
-              <HomeWorkIcon sx={{ color: '#00C896', fontSize: '2.2rem' }} />
-              Home Care &amp; Clinical Dispatch Oversight
+            <Typography variant="h4" sx={{ fontWeight: 900, color: themeColors.textPrimary, display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              <HomeWorkIcon sx={{ color: themeColors.accentTertiary, fontSize: 32 }} /> Home Care Dispatch &amp; Nursing Requests
             </Typography>
-            <Typography variant="body2" sx={{ color: '#94A8A3', mt: 0.5 }}>
-              Manage patient home visit requests, nurse dispatch scheduling, and SLA turnaround
+            <Typography variant="body2" sx={{ color: themeColors.textSecondary, mt: 0.5 }}>
+              Manage doorstep medical care orders, post-op wound recovery, and nurse field deployments
             </Typography>
           </Box>
           <Button
             variant="outlined"
             onClick={() => refreshSection('homeCare')}
             startIcon={<RefreshIcon sx={{ animation: isSyncing ? 'spin 1s linear infinite' : 'none' }} />}
-            sx={{ color: '#00C896', borderColor: 'rgba(0,200,150,0.3)', borderRadius: '12px', textTransform: 'none', fontWeight: 700 }}
+            sx={{ borderRadius: '12px', borderColor: isLight ? 'rgba(124, 58, 237, 0.4)' : 'rgba(192, 132, 252, 0.3)', color: themeColors.accentTertiary, fontWeight: 700 }}
           >
-            Refresh Data
+            Refresh Requests
           </Button>
         </Box>
 
         {toastMessage && (
-          <Alert severity="success" onClose={() => setToastMessage('')} sx={{ mb: 3, borderRadius: '14px', bgcolor: 'rgba(16, 185, 129, 0.15)', color: '#34D399' }}>
+          <Alert severity="success" onClose={() => setToastMessage('')} sx={{ mb: 3, borderRadius: '12px', bgcolor: 'rgba(16, 185, 129, 0.15)', color: isLight ? '#065F46' : '#34D399' }}>
             {toastMessage}
           </Alert>
         )}
 
-        {/* 4 Executive KPI Metric Cards */}
+        {/* 4 Status Quick Metrics */}
         <Grid container spacing={2.5} sx={{ mb: 3.5 }}>
           <Grid item xs={6} sm={3}>
-            <Paper sx={{ p: 2.2, borderRadius: '18px', bgcolor: '#131F22', border: '1px solid rgba(0, 200, 150, 0.2)' }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: '#00C896', mb: 0.5 }}>
-                <HomeWorkIcon sx={{ fontSize: 18 }} />
-                <Typography variant="caption" sx={{ fontWeight: 800, textTransform: 'uppercase' }}>Total Requests</Typography>
-              </Box>
-              <Typography variant="h4" sx={{ fontWeight: 900, color: '#EBF5F3' }}>
-                {totalCount}
-              </Typography>
-              <Typography variant="caption" sx={{ color: '#94A8A3' }}>All Recorded Dispatches</Typography>
-            </Paper>
-          </Grid>
-
-          <Grid item xs={6} sm={3}>
-            <Paper sx={{ p: 2.2, borderRadius: '18px', bgcolor: '#131F22', border: '1px solid rgba(255, 152, 0, 0.25)' }}>
+            <Paper sx={{ p: 2.2, borderRadius: '18px', bgcolor: themeColors.bgPaper, border: `1px solid ${themeColors.border}` }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: '#FF9800', mb: 0.5 }}>
                 <PendingActionsIcon sx={{ fontSize: 18 }} />
-                <Typography variant="caption" sx={{ fontWeight: 800, textTransform: 'uppercase' }}>Pending Approval</Typography>
+                <Typography variant="caption" sx={{ fontWeight: 800, textTransform: 'uppercase' }}>New Requests</Typography>
               </Box>
               <Typography variant="h4" sx={{ fontWeight: 900, color: '#FF9800' }}>
-                {pendingCount}
+                {requestedCount}
               </Typography>
-              <Typography variant="caption" sx={{ color: '#94A8A3' }}>Requires Nurse Assignment</Typography>
+              <Typography variant="caption" sx={{ color: themeColors.textSecondary }}>Awaiting Nurse Dispatch</Typography>
             </Paper>
           </Grid>
 
           <Grid item xs={6} sm={3}>
-            <Paper sx={{ p: 2.2, borderRadius: '18px', bgcolor: '#131F22', border: '1px solid rgba(0, 188, 212, 0.25)' }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: '#00BCD4', mb: 0.5 }}>
+            <Paper sx={{ p: 2.2, borderRadius: '18px', bgcolor: themeColors.bgPaper, border: `1px solid ${themeColors.border}` }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: themeColors.accentSecondary, mb: 0.5 }}>
                 <DirectionsCarIcon sx={{ fontSize: 18 }} />
-                <Typography variant="caption" sx={{ fontWeight: 800, textTransform: 'uppercase' }}>In Progress / En Route</Typography>
+                <Typography variant="caption" sx={{ fontWeight: 800, textTransform: 'uppercase' }}>Assigned Nurses</Typography>
+              </Box>
+              <Typography variant="h4" sx={{ fontWeight: 900, color: themeColors.accentSecondary }}>
+                {assignedCount}
+              </Typography>
+              <Typography variant="caption" sx={{ color: themeColors.textSecondary }}>Scheduled for Visits</Typography>
+            </Paper>
+          </Grid>
+
+          <Grid item xs={6} sm={3}>
+            <Paper sx={{ p: 2.2, borderRadius: '18px', bgcolor: themeColors.bgPaper, border: `1px solid ${themeColors.border}` }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: '#00BCD4', mb: 0.5 }}>
+                <AccessTimeIcon sx={{ fontSize: 18 }} />
+                <Typography variant="caption" sx={{ fontWeight: 800, textTransform: 'uppercase' }}>In Progress</Typography>
               </Box>
               <Typography variant="h4" sx={{ fontWeight: 900, color: '#00BCD4' }}>
                 {inProgressCount}
               </Typography>
-              <Typography variant="caption" sx={{ color: '#94A8A3' }}>Active Field Visits</Typography>
+              <Typography variant="caption" sx={{ color: themeColors.textSecondary }}>Active Field Visits</Typography>
             </Paper>
           </Grid>
 
           <Grid item xs={6} sm={3}>
-            <Paper sx={{ p: 2.2, borderRadius: '18px', bgcolor: '#131F22', border: '1px solid rgba(76, 175, 80, 0.25)' }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: '#4CAF50', mb: 0.5 }}>
+            <Paper sx={{ p: 2.2, borderRadius: '18px', bgcolor: themeColors.bgPaper, border: `1px solid ${themeColors.border}` }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: isLight ? '#059669' : '#4CAF50', mb: 0.5 }}>
                 <CheckCircleIcon sx={{ fontSize: 18 }} />
                 <Typography variant="caption" sx={{ fontWeight: 800, textTransform: 'uppercase' }}>Completed Visits</Typography>
               </Box>
-              <Typography variant="h4" sx={{ fontWeight: 900, color: '#4CAF50' }}>
+              <Typography variant="h4" sx={{ fontWeight: 900, color: isLight ? '#059669' : '#4CAF50' }}>
                 {completedCount}
               </Typography>
-              <Typography variant="caption" sx={{ color: '#94A8A3' }}>Fulfilled Care Visits</Typography>
+              <Typography variant="caption" sx={{ color: themeColors.textSecondary }}>Fulfilled Care Visits</Typography>
             </Paper>
           </Grid>
         </Grid>
 
         {/* Filter & Search Bar */}
-        <Paper sx={{ p: 2.5, mb: 3.5, borderRadius: '20px', bgcolor: '#131F22', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
+        <Paper sx={{ p: 2.5, mb: 3.5, borderRadius: '20px', bgcolor: themeColors.bgPaper, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2, border: `1px solid ${themeColors.border}` }}>
           <Box sx={{ flex: 1, minWidth: 280 }}>
             <TextField
               fullWidth
@@ -230,17 +224,17 @@ export default function HomeCareOversight() {
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
-                    <SearchIcon sx={{ color: '#94A8A3' }} />
+                    <SearchIcon sx={{ color: themeColors.textSecondary }} />
                   </InputAdornment>
                 )
               }}
               sx={{
                 '& .MuiOutlinedInput-root': {
-                  color: '#EBF5F3',
-                  bgcolor: 'rgba(255,255,255,0.03)',
+                  color: themeColors.textPrimary,
+                  bgcolor: isLight ? '#FAF8F5' : 'rgba(255,255,255,0.03)',
                   borderRadius: '14px',
-                  '& fieldset': { borderColor: 'rgba(255, 255, 255, 0.1)' },
-                  '&:hover fieldset': { borderColor: '#00C896' }
+                  '& fieldset': { borderColor: isLight ? 'rgba(45, 80, 60, 0.18)' : 'rgba(255, 255, 255, 0.1)' },
+                  '&:hover fieldset': { borderColor: themeColors.accentPrimary }
                 }
               }}
             />
@@ -260,12 +254,12 @@ export default function HomeCareOversight() {
                 label={f.label}
                 onClick={() => setStatusFilter(f.id)}
                 sx={{
-                  bgcolor: statusFilter === f.id ? '#00C896' : 'rgba(255,255,255,0.05)',
-                  color: statusFilter === f.id ? '#0B1315' : '#94A8A3',
+                  bgcolor: statusFilter === f.id ? themeColors.accentPrimary : (isLight ? '#EBE5D8' : 'rgba(255,255,255,0.05)'),
+                  color: statusFilter === f.id ? (isLight ? '#FFFFFF' : '#0B1315') : themeColors.textPrimary,
                   fontWeight: 800,
                   fontSize: '0.74rem',
                   cursor: 'pointer',
-                  border: statusFilter === f.id ? '1px solid #00C896' : '1px solid rgba(255,255,255,0.08)'
+                  border: statusFilter === f.id ? `1px solid ${themeColors.accentPrimary}` : `1px solid ${themeColors.border}`
                 }}
               />
             ))}
@@ -273,61 +267,61 @@ export default function HomeCareOversight() {
         </Paper>
 
         {/* Requests Table */}
-        <Paper sx={{ bgcolor: '#131F22', borderRadius: '18px', border: '1px solid rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+        <Paper sx={{ bgcolor: themeColors.bgPaper, borderRadius: '18px', border: `1px solid ${themeColors.border}`, overflow: 'hidden' }}>
           {loading ? (
             <Box sx={{ p: 6, display: 'flex', justifyContent: 'center' }}>
-              <CircularProgress sx={{ color: '#00C896' }} />
+              <CircularProgress sx={{ color: themeColors.accentPrimary }} />
             </Box>
           ) : (
             <TableContainer>
               <Table>
-                <TableHead sx={{ bgcolor: '#0B1315' }}>
+                <TableHead sx={{ bgcolor: isLight ? '#EBE5D8' : '#0E1719' }}>
                   <TableRow>
-                    <TableCell sx={{ color: '#94A8A3', fontWeight: 800 }}>Request #</TableCell>
-                    <TableCell sx={{ color: '#94A8A3', fontWeight: 800 }}>Patient Details</TableCell>
-                    <TableCell sx={{ color: '#94A8A3', fontWeight: 800 }}>Service Type &amp; Urgency</TableCell>
-                    <TableCell sx={{ color: '#94A8A3', fontWeight: 800 }}>Assigned Nurse</TableCell>
-                    <TableCell sx={{ color: '#94A8A3', fontWeight: 800 }}>Preferred Schedule</TableCell>
-                    <TableCell sx={{ color: '#94A8A3', fontWeight: 800 }}>Status</TableCell>
-                    <TableCell align="right" sx={{ color: '#94A8A3', fontWeight: 800 }}>Action</TableCell>
+                    <TableCell sx={{ color: themeColors.textSecondary, fontWeight: 800 }}>Request #</TableCell>
+                    <TableCell sx={{ color: themeColors.textSecondary, fontWeight: 800 }}>Patient Details</TableCell>
+                    <TableCell sx={{ color: themeColors.textSecondary, fontWeight: 800 }}>Service Type &amp; Urgency</TableCell>
+                    <TableCell sx={{ color: themeColors.textSecondary, fontWeight: 800 }}>Assigned Nurse</TableCell>
+                    <TableCell sx={{ color: themeColors.textSecondary, fontWeight: 800 }}>Preferred Schedule</TableCell>
+                    <TableCell sx={{ color: themeColors.textSecondary, fontWeight: 800 }}>Status</TableCell>
+                    <TableCell align="right" sx={{ color: themeColors.textSecondary, fontWeight: 800 }}>Action</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {filteredRequests.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={7} sx={{ textAlign: 'center', py: 5, color: '#94A8A3' }}>
+                      <TableCell colSpan={7} sx={{ textAlign: 'center', py: 5, color: themeColors.textSecondary }}>
                         No home care requests found under selected filter.
                       </TableCell>
                     </TableRow>
                   ) : (
                     filteredRequests.map((r: any) => (
-                      <TableRow key={r.id} sx={{ '&:hover': { bgcolor: 'rgba(255,255,255,0.02)' } }}>
-                        <TableCell sx={{ color: '#00C896', fontWeight: 700, fontFamily: 'monospace' }}>
+                      <TableRow key={r.id} sx={{ '& td': { borderColor: themeColors.border, color: themeColors.textPrimary } }}>
+                        <TableCell sx={{ color: themeColors.accentPrimary, fontWeight: 700, fontFamily: 'monospace' }}>
                           {r.requestNumber}
                         </TableCell>
                         <TableCell>
                           <Box
                             onClick={() => setSelectedUser({ id: r.patientId, firstName: r.patientFirstName, lastName: r.patientLastName, role: 'patient', phone: r.contactPhone || r.patientPhone })}
-                            sx={{ cursor: 'pointer', display: 'inline-block', '&:hover': { color: '#60A5FA' } }}
+                            sx={{ cursor: 'pointer', display: 'inline-block', '&:hover': { color: themeColors.accentSecondary } }}
                           >
-                            <Typography sx={{ color: '#EBF5F3', fontWeight: 700 }}>
+                            <Typography sx={{ color: themeColors.textPrimary, fontWeight: 700 }}>
                               {r.patientFirstName} {r.patientLastName}
                             </Typography>
-                            <Typography variant="caption" sx={{ color: '#94A8A3', display: 'block' }}>
+                            <Typography variant="caption" sx={{ color: themeColors.textSecondary, display: 'block' }}>
                               {r.contactPhone || r.patientPhone || 'No phone'}
                             </Typography>
                           </Box>
                         </TableCell>
                         <TableCell>
-                          <Typography sx={{ color: '#EBF5F3', fontWeight: 600 }}>
+                          <Typography sx={{ color: themeColors.textPrimary, fontWeight: 600 }}>
                             {r.serviceType?.replace(/_/g, ' ').toUpperCase()}
                           </Typography>
                           <Chip
                             label={r.urgency?.toUpperCase() || 'ROUTINE'}
                             size="small"
                             sx={{
-                              bgcolor: r.urgency === 'urgent' ? 'rgba(244,67,54,0.15)' : 'rgba(255,255,255,0.05)',
-                              color: r.urgency === 'urgent' ? '#F44336' : '#94A8A3',
+                              bgcolor: r.urgency === 'urgent' ? 'rgba(244,67,54,0.15)' : (isLight ? '#EBE5D8' : 'rgba(255,255,255,0.05)'),
+                              color: r.urgency === 'urgent' ? '#F44336' : themeColors.textSecondary,
                               fontSize: '0.65rem',
                               height: 18
                             }}
@@ -337,12 +331,12 @@ export default function HomeCareOversight() {
                           {r.nurseFirstName ? (
                             <Box
                               onClick={() => r.assignedNurseId && setSelectedUser({ id: r.assignedNurseId, firstName: r.nurseFirstName, lastName: r.nurseLastName, role: 'nurse' })}
-                              sx={{ cursor: 'pointer', display: 'inline-block', '&:hover': { color: '#C084FC' } }}
+                              sx={{ cursor: 'pointer', display: 'inline-block', '&:hover': { color: themeColors.accentTertiary } }}
                             >
-                              <Typography sx={{ color: '#00C896', fontWeight: 700 }}>
+                              <Typography sx={{ color: themeColors.accentPrimary, fontWeight: 700 }}>
                                 {r.nurseFirstName} {r.nurseLastName}
                               </Typography>
-                              <Typography variant="caption" sx={{ color: '#94A8A3', display: 'block' }}>
+                              <Typography variant="caption" sx={{ color: themeColors.textSecondary, display: 'block' }}>
                                 {r.nursePhone || 'RN Field Nurse'}
                               </Typography>
                             </Box>
@@ -350,9 +344,9 @@ export default function HomeCareOversight() {
                             <Chip label="Unassigned Nurse" size="small" sx={{ bgcolor: 'rgba(255,152,0,0.15)', color: '#FF9800', fontWeight: 800, fontSize: '0.68rem' }} />
                           )}
                         </TableCell>
-                        <TableCell sx={{ color: '#EBF5F3' }}>
+                        <TableCell sx={{ color: themeColors.textPrimary }}>
                           <Typography variant="body2">{r.preferredDate || 'Immediate'}</Typography>
-                          <Typography variant="caption" sx={{ color: '#94A8A3' }}>{r.preferredTimeSlot || 'Morning'}</Typography>
+                          <Typography variant="caption" sx={{ color: themeColors.textSecondary }}>{r.preferredTimeSlot || 'Morning'}</Typography>
                         </TableCell>
                         <TableCell>{getStatusChip(r.status)}</TableCell>
                         <TableCell align="right">
@@ -364,10 +358,11 @@ export default function HomeCareOversight() {
                             sx={{
                               borderRadius: '10px',
                               fontWeight: 800,
-                              color: '#00C896',
-                              borderColor: 'rgba(0, 200, 150, 0.4)',
+                              color: themeColors.accentPrimary,
+                              borderColor: isLight ? 'rgba(0,143,104,0.4)' : 'rgba(0, 200, 150, 0.4)',
                               textTransform: 'none',
-                              '&:hover': { bgcolor: 'rgba(0, 200, 150, 0.15)', borderColor: '#00C896' }
+                              fontSize: '0.75rem',
+                              '&:hover': { bgcolor: isLight ? 'rgba(0,143,104,0.1)' : 'rgba(0, 200, 150, 0.15)', borderColor: themeColors.accentPrimary }
                             }}
                           >
                             Dispatch &amp; Manage
@@ -389,46 +384,45 @@ export default function HomeCareOversight() {
         onClose={() => setDispatchModalOpen(false)}
         maxWidth="sm"
         fullWidth
-        PaperProps={{ sx: { bgcolor: '#131F22', color: '#EBF5F3', borderRadius: '20px', border: '1px solid rgba(0,200,150,0.3)' } }}
+        PaperProps={{ sx: { bgcolor: themeColors.bgPaper, color: themeColors.textPrimary, borderRadius: '20px', border: `1px solid ${themeColors.border}` } }}
       >
         {activeRequest && (
           <form onSubmit={handleSaveDispatch}>
-            <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+            <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: `1px solid ${themeColors.border}` }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2 }}>
-                <PersonPinIcon sx={{ color: '#00C896' }} />
-                <Typography variant="h6" sx={{ fontWeight: 900 }}>
+                <PersonPinIcon sx={{ color: themeColors.accentPrimary }} />
+                <Typography variant="h6" sx={{ fontWeight: 900, color: themeColors.textPrimary }}>
                   Manage Home Care Dispatch #{activeRequest.requestNumber}
                 </Typography>
               </Box>
-              <IconButton onClick={() => setDispatchModalOpen(false)} sx={{ color: '#94A8A3' }}>
+              <IconButton onClick={() => setDispatchModalOpen(false)} sx={{ color: themeColors.textSecondary }}>
                 <CloseIcon />
               </IconButton>
             </DialogTitle>
 
             <DialogContent sx={{ p: 3, display: 'flex', flexDirection: 'column', gap: 2.5 }}>
               {/* Patient Profile Card */}
-              <Paper sx={{ p: 2, borderRadius: '12px', bgcolor: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                <Typography variant="caption" sx={{ color: '#94A8A3' }}>PATIENT</Typography>
-                <Typography variant="subtitle1" sx={{ color: '#EBF5F3', fontWeight: 800 }}>
+              <Paper sx={{ p: 2, borderRadius: '12px', bgcolor: isLight ? '#FAF8F5' : 'rgba(255,255,255,0.03)', border: `1px solid ${themeColors.border}` }}>
+                <Typography variant="caption" sx={{ color: themeColors.textSecondary }}>PATIENT</Typography>
+                <Typography variant="subtitle1" sx={{ color: themeColors.textPrimary, fontWeight: 800 }}>
                   {activeRequest.patientFirstName} {activeRequest.patientLastName} ({activeRequest.contactPhone || activeRequest.patientPhone || 'N/A'})
                 </Typography>
-                <Typography variant="caption" sx={{ color: '#38BDF8', display: 'block', mt: 0.5 }}>
+                <Typography variant="caption" sx={{ color: themeColors.accentSecondary, display: 'block', mt: 0.5 }}>
                   Address: {activeRequest.address || 'Patna Primary Residence'}
                 </Typography>
               </Paper>
 
               {/* Nurse Assignment Select */}
               <FormControl fullWidth>
-                <InputLabel sx={{ color: '#94A8A3' }}>Assign Field Nurse</InputLabel>
+                <InputLabel sx={{ color: themeColors.textSecondary }}>Assign Field Nurse</InputLabel>
                 <Select
                   value={selectedNurseId}
                   onChange={(e) => setSelectedNurseId(e.target.value)}
                   label="Assign Field Nurse"
                   sx={{
-                    bgcolor: 'rgba(255,255,255,0.03)',
-                    color: '#EBF5F3',
-                    borderRadius: '12px',
-                    '& fieldset': { borderColor: 'rgba(255,255,255,0.15)' }
+                    bgcolor: isLight ? '#FAF8F5' : 'rgba(255,255,255,0.03)',
+                    color: themeColors.textPrimary,
+                    borderRadius: '12px'
                   }}
                 >
                   <MenuItem value="">
@@ -444,16 +438,15 @@ export default function HomeCareOversight() {
 
               {/* Status Select */}
               <FormControl fullWidth>
-                <InputLabel sx={{ color: '#94A8A3' }}>Dispatch Status</InputLabel>
+                <InputLabel sx={{ color: themeColors.textSecondary }}>Dispatch Status</InputLabel>
                 <Select
                   value={selectedStatus}
                   onChange={(e) => setSelectedStatus(e.target.value)}
                   label="Dispatch Status"
                   sx={{
-                    bgcolor: 'rgba(255,255,255,0.03)',
-                    color: '#EBF5F3',
-                    borderRadius: '12px',
-                    '& fieldset': { borderColor: 'rgba(255,255,255,0.15)' }
+                    bgcolor: isLight ? '#FAF8F5' : 'rgba(255,255,255,0.03)',
+                    color: themeColors.textPrimary,
+                    borderRadius: '12px'
                   }}
                 >
                   <MenuItem value="requested">Requested (Pending Approval)</MenuItem>
@@ -468,9 +461,9 @@ export default function HomeCareOversight() {
               {/* Clinical Instructions */}
               {activeRequest.clinicalInstructions && (
                 <Box>
-                  <Typography variant="caption" sx={{ color: '#94A8A3' }}>Doctor / Clinical Instructions:</Typography>
-                  <Paper sx={{ p: 1.5, borderRadius: '10px', bgcolor: 'rgba(0,200,150,0.05)', border: '1px solid rgba(0,200,150,0.2)', mt: 0.5 }}>
-                    <Typography variant="body2" sx={{ color: '#EBF5F3' }}>
+                  <Typography variant="caption" sx={{ color: themeColors.textSecondary }}>Doctor / Clinical Instructions:</Typography>
+                  <Paper sx={{ p: 1.5, borderRadius: '10px', bgcolor: isLight ? 'rgba(0, 143, 104, 0.08)' : 'rgba(0,200,150,0.05)', border: isLight ? '1px solid rgba(0, 143, 104, 0.25)' : '1px solid rgba(0,200,150,0.2)', mt: 0.5 }}>
+                    <Typography variant="body2" sx={{ color: themeColors.textPrimary }}>
                       {activeRequest.clinicalInstructions}
                     </Typography>
                   </Paper>
@@ -478,15 +471,15 @@ export default function HomeCareOversight() {
               )}
             </DialogContent>
 
-            <DialogActions sx={{ p: 2.5, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-              <Button onClick={() => setDispatchModalOpen(false)} sx={{ color: '#94A8A3' }}>
+            <DialogActions sx={{ p: 2.5, borderTop: `1px solid ${themeColors.border}` }}>
+              <Button onClick={() => setDispatchModalOpen(false)} sx={{ color: themeColors.textSecondary }}>
                 Cancel
               </Button>
               <Button
                 type="submit"
                 variant="contained"
                 disabled={actionLoading}
-                sx={{ bgcolor: '#00C896', color: '#0B1315', fontWeight: 800, borderRadius: '10px' }}
+                sx={{ bgcolor: themeColors.accentPrimary, color: isLight ? '#FFFFFF' : '#0B1315', fontWeight: 800, borderRadius: '10px', '&:hover': { bgcolor: isLight ? '#007A5A' : '#00A87E' } }}
               >
                 {actionLoading ? <CircularProgress size={20} /> : 'Save Dispatch Updates'}
               </Button>

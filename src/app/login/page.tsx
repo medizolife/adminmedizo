@@ -11,10 +11,16 @@ import CircularProgress from '@mui/material/CircularProgress';
 import Avatar from '@mui/material/Avatar';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import VerifiedUserIcon from '@mui/icons-material/VerifiedUser';
+import LightModeIcon from '@mui/icons-material/LightMode';
+import DarkModeIcon from '@mui/icons-material/DarkMode';
+import IconButton from '@mui/material/IconButton';
+
 import { adminApi } from '@/services/adminApi';
+import { useAppTheme } from '@/context/ThemeContext';
 
 export default function AdminLogin() {
   const router = useRouter();
+  const { mode, toggleColorMode, isLight, themeColors } = useAppTheme();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -43,11 +49,29 @@ export default function AdminLogin() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        bgcolor: '#0B1315',
-        backgroundImage: 'radial-gradient(circle at 50% 30%, rgba(0, 200, 150, 0.12) 0%, transparent 60%)',
-        p: 2
+        bgcolor: themeColors.bgDefault,
+        backgroundImage: isLight
+          ? 'radial-gradient(circle at 50% 30%, rgba(0, 143, 104, 0.08) 0%, transparent 60%)'
+          : 'radial-gradient(circle at 50% 30%, rgba(0, 200, 150, 0.12) 0%, transparent 60%)',
+        p: 2,
+        position: 'relative'
       }}
     >
+      {/* Top right theme switch */}
+      <Box sx={{ position: 'absolute', top: 20, right: 20 }}>
+        <IconButton
+          onClick={toggleColorMode}
+          sx={{
+            bgcolor: themeColors.bgPaper,
+            border: `1px solid ${themeColors.border}`,
+            color: themeColors.textPrimary,
+            p: 1.2
+          }}
+        >
+          {isLight ? <DarkModeIcon fontSize="small" sx={{ color: '#D97706' }} /> : <LightModeIcon fontSize="small" sx={{ color: '#FBBF24' }} />}
+        </IconButton>
+      </Box>
+
       <Paper
         elevation={0}
         sx={{
@@ -55,26 +79,26 @@ export default function AdminLogin() {
           maxWidth: 440,
           width: '100%',
           borderRadius: '24px',
-          bgcolor: 'rgba(19, 31, 34, 0.85)',
+          bgcolor: themeColors.bgPaper,
           backdropFilter: 'blur(20px)',
-          border: '1px solid rgba(0, 200, 150, 0.25)',
-          boxShadow: '0 20px 50px rgba(0, 0, 0, 0.5)'
+          border: `1px solid ${themeColors.border}`,
+          boxShadow: isLight ? '0 20px 50px rgba(0, 0, 0, 0.06)' : '0 20px 50px rgba(0, 0, 0, 0.5)'
         }}
       >
         <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mb: 4 }}>
-          <Avatar sx={{ m: 1, bgcolor: '#00C896', color: '#0B1315', width: 56, height: 56, boxShadow: '0 0 20px rgba(0,200,150,0.5)' }}>
+          <Avatar sx={{ m: 1, bgcolor: themeColors.accentPrimary, color: isLight ? '#FFFFFF' : '#0B1315', width: 56, height: 56, boxShadow: isLight ? '0 0 20px rgba(0,143,104,0.3)' : '0 0 20px rgba(0,200,150,0.5)' }}>
             <LockOutlinedIcon fontSize="large" />
           </Avatar>
-          <Typography variant="h5" sx={{ fontWeight: 900, color: '#EBF5F3', mt: 1 }}>
-            Medizo <span style={{ color: '#00C896' }}>Admin Portal</span>
+          <Typography variant="h5" sx={{ fontWeight: 900, color: themeColors.textPrimary, mt: 1 }}>
+            Medizo <span style={{ color: themeColors.accentPrimary }}>Admin Portal</span>
           </Typography>
-          <Typography variant="body2" sx={{ color: '#94A8A3', mt: 0.5, textAlign: 'center' }}>
-            System-wide management for Doctors, Patients & Pharmacists
+          <Typography variant="body2" sx={{ color: themeColors.textSecondary, mt: 0.5, textAlign: 'center' }}>
+            System-wide management for Doctors, Patients &amp; Pharmacists
           </Typography>
         </Box>
 
         {error && (
-          <Alert severity="error" sx={{ mb: 3, borderRadius: '12px', bgcolor: 'rgba(239, 68, 68, 0.15)', color: '#FCA5A5' }}>
+          <Alert severity="error" sx={{ mb: 3, borderRadius: '12px', bgcolor: 'rgba(239, 68, 68, 0.15)', color: '#EF4444' }}>
             {error}
           </Alert>
         )}
@@ -94,14 +118,14 @@ export default function AdminLogin() {
             sx={{
               mb: 2,
               '& .MuiOutlinedInput-root': {
-                color: '#EBF5F3',
-                bgcolor: 'rgba(255,255,255,0.03)',
+                color: themeColors.textPrimary,
+                bgcolor: isLight ? '#FAF8F5' : 'rgba(255,255,255,0.03)',
                 borderRadius: '14px',
-                '& fieldset': { borderColor: 'rgba(255, 255, 255, 0.15)' },
-                '&:hover fieldset': { borderColor: '#00C896' },
-                '&.Mui-focused fieldset': { borderColor: '#00C896' }
+                '& fieldset': { borderColor: isLight ? 'rgba(45, 80, 60, 0.18)' : 'rgba(255, 255, 255, 0.15)' },
+                '&:hover fieldset': { borderColor: themeColors.accentPrimary },
+                '&.Mui-focused fieldset': { borderColor: themeColors.accentPrimary }
               },
-              '& .MuiInputLabel-root': { color: '#94A8A3' }
+              '& .MuiInputLabel-root': { color: themeColors.textSecondary }
             }}
           />
           <TextField
@@ -118,14 +142,14 @@ export default function AdminLogin() {
             sx={{
               mb: 3,
               '& .MuiOutlinedInput-root': {
-                color: '#EBF5F3',
-                bgcolor: 'rgba(255,255,255,0.03)',
+                color: themeColors.textPrimary,
+                bgcolor: isLight ? '#FAF8F5' : 'rgba(255,255,255,0.03)',
                 borderRadius: '14px',
-                '& fieldset': { borderColor: 'rgba(255, 255, 255, 0.15)' },
-                '&:hover fieldset': { borderColor: '#00C896' },
-                '&.Mui-focused fieldset': { borderColor: '#00C896' }
+                '& fieldset': { borderColor: isLight ? 'rgba(45, 80, 60, 0.18)' : 'rgba(255, 255, 255, 0.15)' },
+                '&:hover fieldset': { borderColor: themeColors.accentPrimary },
+                '&.Mui-focused fieldset': { borderColor: themeColors.accentPrimary }
               },
-              '& .MuiInputLabel-root': { color: '#94A8A3' }
+              '& .MuiInputLabel-root': { color: themeColors.textSecondary }
             }}
           />
           <Button
@@ -138,19 +162,19 @@ export default function AdminLogin() {
               borderRadius: '14px',
               fontSize: '1rem',
               fontWeight: 800,
-              bgcolor: '#00C896',
-              color: '#0B1315',
-              boxShadow: '0 8px 24px rgba(0, 200, 150, 0.3)',
-              '&:hover': { bgcolor: '#33D3AA' }
+              bgcolor: themeColors.accentPrimary,
+              color: isLight ? '#FFFFFF' : '#0B1315',
+              boxShadow: isLight ? '0 8px 24px rgba(0, 143, 104, 0.25)' : '0 8px 24px rgba(0, 200, 150, 0.3)',
+              '&:hover': { bgcolor: isLight ? '#007A5A' : '#33D3AA' }
             }}
           >
             {loading ? <CircularProgress size={24} color="inherit" /> : 'Access Admin Dashboard'}
           </Button>
         </form>
 
-        <Box sx={{ mt: 3, pt: 2, borderTop: '1px solid rgba(255,255,255,0.08)', textAlign: 'center' }}>
-          <Typography variant="caption" sx={{ color: '#94A8A3', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.8 }}>
-            <VerifiedUserIcon sx={{ fontSize: 14, color: '#00C896' }} /> Connected to Live Cloudflare D1 Database
+        <Box sx={{ mt: 3, pt: 2, borderTop: `1px solid ${themeColors.border}`, textAlign: 'center' }}>
+          <Typography variant="caption" sx={{ color: themeColors.textSecondary, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.8 }}>
+            <VerifiedUserIcon sx={{ fontSize: 14, color: themeColors.accentPrimary }} /> Connected to Live Cloudflare D1 Database
           </Typography>
         </Box>
       </Paper>

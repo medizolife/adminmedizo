@@ -36,9 +36,11 @@ import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import AdminLayout from '@/components/AdminLayout';
 import UserDetailModal from '@/components/UserDetailModal';
 import { useAdminData } from '@/context/AdminDataContext';
+import { useAppTheme } from '@/context/ThemeContext';
 
 export default function BillingOversight() {
   const { billing, isPreloaded, isSyncing, refreshSection, updateBillStatusLocal } = useAdminData();
+  const { isLight, themeColors } = useAppTheme();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedUser, setSelectedUser] = useState<any>(null);
@@ -58,147 +60,114 @@ export default function BillingOversight() {
     }
     if (search.trim()) {
       const q = search.toLowerCase();
-      const match =
-        (b.billNumber && b.billNumber.toLowerCase().includes(q)) ||
-        (b.doctorName && b.doctorName.toLowerCase().includes(q)) ||
-        (b.patientName && b.patientName.toLowerCase().includes(q)) ||
-        (b.paymentTransactionRef && b.paymentTransactionRef.toLowerCase().includes(q)) ||
-        (b.paymentMethod && b.paymentMethod.toLowerCase().includes(q));
-      if (!match) return false;
+      return (
+        String(b.billNumber || '').toLowerCase().includes(q) ||
+        String(b.doctorName || '').toLowerCase().includes(q) ||
+        String(b.patientName || '').toLowerCase().includes(q) ||
+        String(b.paymentTransactionRef || '').toLowerCase().includes(q)
+      );
     }
     return true;
   });
 
   const handleMarkPaid = async (bill: any) => {
-    if (!window.confirm(`Confirm settling payment for Bill #${bill.billNumber} (Amount: ₹${bill.totalAmount})?`)) {
-      return;
-    }
     setActionLoading(true);
     try {
-      const success = await updateBillStatusLocal(bill.id, 'paid', {
-        paymentMethod: 'UPI / Admin Verified',
-        paymentTransactionRef: `tx_admin_${Date.now()}`
-      });
-      if (success) {
-        setToastMessage(`✅ Bill #${bill.billNumber} marked as fully PAID and settled.`);
-      }
+      const ok = await updateBillStatusLocal(bill.id, 'paid', Number(bill.totalAmount || 0));
+      if (ok) setToastMessage(`Invoice ${bill.billNumber} marked as PAID`);
     } catch (e) {
-      alert('Failed to settle bill');
+      console.error(e);
     } finally {
       setActionLoading(false);
     }
   };
 
-  const getStatusChip = (status: string, balanceDue: number) => {
-    if (status === 'paid' || balanceDue === 0) {
-      return <Chip label="PAID ✓" size="small" sx={{ bgcolor: 'rgba(76,175,80,0.15)', color: '#4CAF50', fontWeight: 800, fontSize: '0.72rem' }} />;
-    }
-    const map: Record<string, { color: string; bg: string }> = {
-      draft: { color: '#FF9800', bg: 'rgba(255,152,0,0.15)' },
-      issued: { color: '#2196F3', bg: 'rgba(33,150,243,0.15)' },
-      partially_paid: { color: '#F59E0B', bg: 'rgba(245,158,11,0.15)' },
-      cancelled: { color: '#F44336', bg: 'rgba(244,67,54,0.15)' },
-      refunded: { color: '#9C27B0', bg: 'rgba(156,39,176,0.15)' }
-    };
-    const s = map[status] || { color: '#FF9800', bg: 'rgba(255,152,0,0.15)' };
-    return (
-      <Chip
-        label={status ? status.toUpperCase() : 'PENDING'}
-        size="small"
-        sx={{ bgcolor: s.bg, color: s.color, fontWeight: 800, fontSize: '0.72rem' }}
-      />
-    );
-  };
-
   return (
     <AdminLayout>
-      <Box sx={{ p: { xs: 2, md: 4 } }}>
+      <Box sx={{ mb: 4 }}>
         {/* Header */}
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, flexWrap: 'wrap', gap: 2 }}>
           <Box>
-            <Typography variant="h4" sx={{ fontWeight: 900, color: '#EBF5F3', display: 'flex', alignItems: 'center', gap: 1.5 }}>
-              <PaymentsIcon sx={{ color: '#00C896', fontSize: '2.2rem' }} />
-              Prescription Billing &amp; Revenue Oversight
+            <Typography variant="h4" sx={{ fontWeight: 900, color: themeColors.textPrimary, display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              <PaymentsIcon sx={{ color: themeColors.accentPrimary, fontSize: 32 }} /> Billing &amp; Invoicing Oversight
             </Typography>
-            <Typography variant="body2" sx={{ color: '#94A8A3', mt: 0.5 }}>
-              Medical patient bills, Indian GST compliance, split ledger audit, and revenue analytics
+            <Typography variant="body2" sx={{ color: themeColors.textSecondary, mt: 0.5 }}>
+              Auditable GST compliance (SAC 999312 exemption), invoice generation, and revenue collection ledger
             </Typography>
           </Box>
           <Button
             variant="outlined"
             onClick={() => refreshSection('billing')}
             startIcon={<RefreshIcon sx={{ animation: isSyncing ? 'spin 1s linear infinite' : 'none' }} />}
-            sx={{ color: '#00C896', borderColor: 'rgba(0,200,150,0.3)', borderRadius: '12px', textTransform: 'none', fontWeight: 700 }}
+            sx={{ borderRadius: '12px', borderColor: isLight ? 'rgba(0,143,104,0.4)' : 'rgba(0, 200, 150, 0.3)', color: themeColors.accentPrimary, fontWeight: 700 }}
           >
             Refresh Billing
           </Button>
         </Box>
 
         {toastMessage && (
-          <Alert severity="success" onClose={() => setToastMessage('')} sx={{ mb: 3, borderRadius: '14px', bgcolor: 'rgba(16, 185, 129, 0.15)', color: '#34D399' }}>
+          <Alert severity="success" onClose={() => setToastMessage('')} sx={{ mb: 3, borderRadius: '12px', bgcolor: 'rgba(16, 185, 129, 0.15)', color: isLight ? '#065F46' : '#34D399' }}>
             {toastMessage}
           </Alert>
         )}
 
-        {/* Top Metric Cards */}
-        {metrics && (
-          <Grid container spacing={2.5} sx={{ mb: 3.5 }}>
-            <Grid item xs={6} sm={3}>
-              <Paper sx={{ p: 2.2, borderRadius: '18px', bgcolor: '#131F22', border: '1px solid rgba(0, 200, 150, 0.2)' }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: '#00C896', mb: 0.5 }}>
-                  <MonetizationOnIcon sx={{ fontSize: 18 }} />
-                  <Typography variant="caption" sx={{ fontWeight: 800, textTransform: 'uppercase' }}>Total Invoiced</Typography>
-                </Box>
-                <Typography variant="h4" sx={{ fontWeight: 900, color: '#EBF5F3' }}>
-                  ₹{metrics.totalBilled?.toLocaleString() || '0.00'}
-                </Typography>
-                <Typography variant="caption" sx={{ color: '#94A8A3' }}>Gross Invoicing Volume</Typography>
-              </Paper>
-            </Grid>
-
-            <Grid item xs={6} sm={3}>
-              <Paper sx={{ p: 2.2, borderRadius: '18px', bgcolor: '#131F22', border: '1px solid rgba(76, 175, 80, 0.25)' }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: '#4CAF50', mb: 0.5 }}>
-                  <CheckCircleIcon sx={{ fontSize: 18 }} />
-                  <Typography variant="caption" sx={{ fontWeight: 800, textTransform: 'uppercase' }}>Total Collected</Typography>
-                </Box>
-                <Typography variant="h4" sx={{ fontWeight: 900, color: '#4CAF50' }}>
-                  ₹{metrics.totalCollected?.toLocaleString() || '0.00'}
-                </Typography>
-                <Typography variant="caption" sx={{ color: '#94A8A3' }}>Settled Collections</Typography>
-              </Paper>
-            </Grid>
-
-            <Grid item xs={6} sm={3}>
-              <Paper sx={{ p: 2.2, borderRadius: '18px', bgcolor: '#131F22', border: '1px solid rgba(239, 68, 68, 0.25)' }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: '#EF4444', mb: 0.5 }}>
-                  <AccountBalanceWalletIcon sx={{ fontSize: 18 }} />
-                  <Typography variant="caption" sx={{ fontWeight: 800, textTransform: 'uppercase' }}>Pending Dues</Typography>
-                </Box>
-                <Typography variant="h4" sx={{ fontWeight: 900, color: metrics.totalPending > 0 ? '#EF4444' : '#00C896' }}>
-                  ₹{metrics.totalPending?.toLocaleString() || '0.00'}
-                </Typography>
-                <Typography variant="caption" sx={{ color: '#94A8A3' }}>Accounts Receivable</Typography>
-              </Paper>
-            </Grid>
-
-            <Grid item xs={6} sm={3}>
-              <Paper sx={{ p: 2.2, borderRadius: '18px', bgcolor: '#131F22', border: '1px solid rgba(56, 189, 248, 0.25)' }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: '#38BDF8', mb: 0.5 }}>
-                  <ReceiptLongIcon sx={{ fontSize: 18 }} />
-                  <Typography variant="caption" sx={{ fontWeight: 800, textTransform: 'uppercase' }}>GST Exemption</Typography>
-                </Box>
-                <Typography variant="h4" sx={{ fontWeight: 900, color: '#38BDF8' }}>
-                  {metrics.exemptCount || 0} / {bills.length}
-                </Typography>
-                <Typography variant="caption" sx={{ color: '#94A8A3' }}>SAC 999312 Exempt Ratio</Typography>
-              </Paper>
-            </Grid>
+        {/* Executive Billing KPI Strip */}
+        <Grid container spacing={2.5} sx={{ mb: 3.5 }}>
+          <Grid item xs={12} sm={6} md={3}>
+            <Paper sx={{ p: 2.5, borderRadius: '18px', bgcolor: themeColors.bgPaper, border: `1px solid ${themeColors.border}` }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: themeColors.accentPrimary, mb: 1 }}>
+                <MonetizationOnIcon />
+                <Typography variant="caption" sx={{ fontWeight: 800, textTransform: 'uppercase' }}>Gross Revenue Billed</Typography>
+              </Box>
+              <Typography variant="h4" sx={{ fontWeight: 900, color: themeColors.textPrimary }}>
+                ₹{(metrics?.totalRevenue || bills.reduce((acc: number, b: any) => acc + (Number(b.totalAmount) || 0), 0)).toLocaleString()}
+              </Typography>
+              <Typography variant="caption" sx={{ color: isLight ? '#059669' : '#34D399' }}>Cumulative ledger volume</Typography>
+            </Paper>
           </Grid>
-        )}
+
+          <Grid item xs={12} sm={6} md={3}>
+            <Paper sx={{ p: 2.5, borderRadius: '18px', bgcolor: themeColors.bgPaper, border: `1px solid ${themeColors.border}` }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: isLight ? '#059669' : '#4CAF50', mb: 1 }}>
+                <CheckCircleIcon />
+                <Typography variant="caption" sx={{ fontWeight: 800, textTransform: 'uppercase' }}>Collected Payments</Typography>
+              </Box>
+              <Typography variant="h4" sx={{ fontWeight: 900, color: isLight ? '#059669' : '#4CAF50' }}>
+                ₹{(metrics?.collectedRevenue || bills.reduce((acc: number, b: any) => acc + (Number(b.amountPaid) || (b.status === 'paid' ? Number(b.totalAmount) : 0)), 0)).toLocaleString()}
+              </Typography>
+              <Typography variant="caption" sx={{ color: themeColors.textSecondary }}>Settled &amp; realized revenue</Typography>
+            </Paper>
+          </Grid>
+
+          <Grid item xs={12} sm={6} md={3}>
+            <Paper sx={{ p: 2.5, borderRadius: '18px', bgcolor: themeColors.bgPaper, border: `1px solid ${themeColors.border}` }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: '#EF4444', mb: 1 }}>
+                <AccountBalanceWalletIcon />
+                <Typography variant="caption" sx={{ fontWeight: 800, textTransform: 'uppercase' }}>Pending Receivables</Typography>
+              </Box>
+              <Typography variant="h4" sx={{ fontWeight: 900, color: '#EF4444' }}>
+                ₹{(metrics?.outstandingDue || bills.reduce((acc: number, b: any) => acc + (Number(b.balanceDue) || (b.status === 'paid' ? 0 : Number(b.totalAmount))), 0)).toLocaleString()}
+              </Typography>
+              <Typography variant="caption" sx={{ color: '#EF4444' }}>Outstanding patient dues</Typography>
+            </Paper>
+          </Grid>
+
+          <Grid item xs={12} sm={6} md={3}>
+            <Paper sx={{ p: 2.5, borderRadius: '18px', bgcolor: themeColors.bgPaper, border: `1px solid ${themeColors.border}` }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: themeColors.accentSecondary, mb: 1 }}>
+                <ReceiptLongIcon />
+                <Typography variant="caption" sx={{ fontWeight: 800, textTransform: 'uppercase' }}>Invoices Processed</Typography>
+              </Box>
+              <Typography variant="h4" sx={{ fontWeight: 900, color: themeColors.textPrimary }}>
+                {metrics?.totalBillsCount || bills.length || 0}
+              </Typography>
+              <Typography variant="caption" sx={{ color: themeColors.textSecondary }}>GST SAC 999312 compliant</Typography>
+            </Paper>
+          </Grid>
+        </Grid>
 
         {/* Filter & Search Bar */}
-        <Paper sx={{ p: 2.5, mb: 3.5, borderRadius: '20px', bgcolor: '#131F22', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
+        <Paper sx={{ p: 2.5, mb: 3.5, borderRadius: '20px', bgcolor: themeColors.bgPaper, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2, border: `1px solid ${themeColors.border}` }}>
           <Box sx={{ flex: 1, minWidth: 280 }}>
             <TextField
               fullWidth
@@ -208,17 +177,17 @@ export default function BillingOversight() {
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
-                    <SearchIcon sx={{ color: '#94A8A3' }} />
+                    <SearchIcon sx={{ color: themeColors.textSecondary }} />
                   </InputAdornment>
                 )
               }}
               sx={{
                 '& .MuiOutlinedInput-root': {
-                  color: '#EBF5F3',
-                  bgcolor: 'rgba(255,255,255,0.03)',
+                  color: themeColors.textPrimary,
+                  bgcolor: isLight ? '#FAF8F5' : 'rgba(255,255,255,0.03)',
                   borderRadius: '14px',
-                  '& fieldset': { borderColor: 'rgba(255, 255, 255, 0.1)' },
-                  '&:hover fieldset': { borderColor: '#00C896' }
+                  '& fieldset': { borderColor: isLight ? 'rgba(45, 80, 60, 0.18)' : 'rgba(255, 255, 255, 0.1)' },
+                  '&:hover fieldset': { borderColor: themeColors.accentPrimary }
                 }
               }}
             />
@@ -237,12 +206,12 @@ export default function BillingOversight() {
                 label={f.label}
                 onClick={() => setStatusFilter(f.id)}
                 sx={{
-                  bgcolor: statusFilter === f.id ? '#00C896' : 'rgba(255,255,255,0.05)',
-                  color: statusFilter === f.id ? '#0B1315' : '#94A8A3',
+                  bgcolor: statusFilter === f.id ? themeColors.accentPrimary : (isLight ? '#EBE5D8' : 'rgba(255,255,255,0.05)'),
+                  color: statusFilter === f.id ? (isLight ? '#FFFFFF' : '#0B1315') : themeColors.textPrimary,
                   fontWeight: 800,
                   fontSize: '0.74rem',
                   cursor: 'pointer',
-                  border: statusFilter === f.id ? '1px solid #00C896' : '1px solid rgba(255,255,255,0.08)'
+                  border: statusFilter === f.id ? `1px solid ${themeColors.accentPrimary}` : `1px solid ${themeColors.border}`
                 }}
               />
             ))}
@@ -250,30 +219,30 @@ export default function BillingOversight() {
         </Paper>
 
         {/* Invoices Table */}
-        <Paper sx={{ bgcolor: '#131F22', borderRadius: '18px', border: '1px solid rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+        <Paper sx={{ bgcolor: themeColors.bgPaper, borderRadius: '18px', border: `1px solid ${themeColors.border}`, overflow: 'hidden' }}>
           {loading ? (
             <Box sx={{ p: 6, display: 'flex', justifyContent: 'center' }}>
-              <CircularProgress sx={{ color: '#00C896' }} />
+              <CircularProgress sx={{ color: themeColors.accentPrimary }} />
             </Box>
           ) : (
             <TableContainer>
               <Table>
-                <TableHead sx={{ bgcolor: '#0B1315' }}>
+                <TableHead sx={{ bgcolor: isLight ? '#EBE5D8' : '#0E1719' }}>
                   <TableRow>
-                    <TableCell sx={{ color: '#94A8A3', fontWeight: 800 }}>Invoice #</TableCell>
-                    <TableCell sx={{ color: '#94A8A3', fontWeight: 800 }}>Doctor / Clinic</TableCell>
-                    <TableCell sx={{ color: '#94A8A3', fontWeight: 800 }}>Patient</TableCell>
-                    <TableCell sx={{ color: '#94A8A3', fontWeight: 800 }}>GST SAC</TableCell>
-                    <TableCell sx={{ color: '#94A8A3', fontWeight: 800 }}>Total Billed</TableCell>
-                    <TableCell sx={{ color: '#94A8A3', fontWeight: 800 }}>Payment Status</TableCell>
-                    <TableCell sx={{ color: '#94A8A3', fontWeight: 800 }}>Method &amp; Ref</TableCell>
-                    <TableCell align="right" sx={{ color: '#94A8A3', fontWeight: 800 }}>Action</TableCell>
+                    <TableCell sx={{ color: themeColors.textSecondary, fontWeight: 800 }}>Invoice #</TableCell>
+                    <TableCell sx={{ color: themeColors.textSecondary, fontWeight: 800 }}>Doctor / Clinic</TableCell>
+                    <TableCell sx={{ color: themeColors.textSecondary, fontWeight: 800 }}>Patient</TableCell>
+                    <TableCell sx={{ color: themeColors.textSecondary, fontWeight: 800 }}>GST SAC</TableCell>
+                    <TableCell sx={{ color: themeColors.textSecondary, fontWeight: 800 }}>Total Billed</TableCell>
+                    <TableCell sx={{ color: themeColors.textSecondary, fontWeight: 800 }}>Payment Status</TableCell>
+                    <TableCell sx={{ color: themeColors.textSecondary, fontWeight: 800 }}>Method &amp; Ref</TableCell>
+                    <TableCell align="right" sx={{ color: themeColors.textSecondary, fontWeight: 800 }}>Action</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {filteredBills.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={8} sx={{ textAlign: 'center', py: 5, color: '#94A8A3' }}>
+                      <TableCell colSpan={8} sx={{ textAlign: 'center', py: 5, color: themeColors.textSecondary }}>
                         No billing records found under selected filter.
                       </TableCell>
                     </TableRow>
@@ -284,15 +253,15 @@ export default function BillingOversight() {
                       const bal = Number(b.balanceDue) || (b.status === 'paid' ? 0 : Number(b.totalAmount));
 
                       return (
-                        <TableRow key={b.id} sx={{ '&:hover': { bgcolor: 'rgba(255,255,255,0.02)' } }}>
-                          <TableCell sx={{ color: '#00C896', fontWeight: 700, fontFamily: 'monospace' }}>
+                        <TableRow key={b.id} sx={{ '& td': { borderColor: themeColors.border, color: themeColors.textPrimary } }}>
+                          <TableCell sx={{ color: themeColors.accentPrimary, fontWeight: 700, fontFamily: 'monospace' }}>
                             {b.billNumber}
                           </TableCell>
                           <TableCell>
-                            <Typography sx={{ color: '#EBF5F3', fontWeight: 700 }}>{b.doctorName}</Typography>
+                            <Typography sx={{ color: themeColors.textPrimary, fontWeight: 700 }}>{b.doctorName}</Typography>
                           </TableCell>
                           <TableCell>
-                            <Typography sx={{ color: '#EBF5F3', fontWeight: 700 }}>{b.patientName}</Typography>
+                            <Typography sx={{ color: themeColors.textPrimary, fontWeight: 700 }}>{b.patientName}</Typography>
                           </TableCell>
                           <TableCell>
                             <Chip
@@ -301,16 +270,16 @@ export default function BillingOversight() {
                               sx={{
                                 fontWeight: 800,
                                 fontSize: '0.65rem',
-                                bgcolor: isExempt ? 'rgba(0,200,150,0.15)' : 'rgba(255,152,0,0.15)',
-                                color: isExempt ? '#00C896' : '#FF9800'
+                                bgcolor: isExempt ? (isLight ? 'rgba(0, 143, 104, 0.12)' : 'rgba(0,200,150,0.15)') : 'rgba(255,152,0,0.15)',
+                                color: isExempt ? themeColors.accentPrimary : '#FF9800'
                               }}
                             />
                           </TableCell>
-                          <TableCell sx={{ color: '#00C896', fontWeight: 900, fontSize: '1.05rem' }}>
+                          <TableCell sx={{ color: themeColors.accentPrimary, fontWeight: 900, fontSize: '1.05rem' }}>
                             ₹{Number(b.totalAmount || 0).toLocaleString()}
                           </TableCell>
                           <TableCell>
-                            <Typography variant="caption" sx={{ color: '#4CAF50', fontWeight: 800, display: 'block' }}>
+                            <Typography variant="caption" sx={{ color: isLight ? '#059669' : '#4CAF50', fontWeight: 800, display: 'block' }}>
                               Paid: ₹{paid.toLocaleString()}
                             </Typography>
                             {bal > 0 && (
@@ -319,14 +288,14 @@ export default function BillingOversight() {
                               </Typography>
                             )}
                           </TableCell>
-                          <TableCell sx={{ color: '#94A8A3' }}>
+                          <TableCell sx={{ color: themeColors.textSecondary }}>
                             {b.paymentMethod ? (
                               <Box>
-                                <Typography variant="body2" sx={{ color: '#EBF5F3', fontWeight: 600, textTransform: 'uppercase' }}>
+                                <Typography variant="body2" sx={{ color: themeColors.textPrimary, fontWeight: 600, textTransform: 'uppercase' }}>
                                   {b.paymentMethod}
                                 </Typography>
                                 {b.paymentTransactionRef && (
-                                  <Typography variant="caption" sx={{ fontFamily: 'monospace', color: '#38BDF8', display: 'block', fontSize: '0.68rem' }}>
+                                  <Typography variant="caption" sx={{ fontFamily: 'monospace', color: themeColors.accentSecondary, display: 'block', fontSize: '0.68rem' }}>
                                     {b.paymentTransactionRef}
                                   </Typography>
                                 )}
@@ -347,30 +316,32 @@ export default function BillingOversight() {
                                 sx={{
                                   borderRadius: '10px',
                                   fontWeight: 800,
-                                  color: '#38BDF8',
-                                  borderColor: 'rgba(56, 189, 248, 0.4)',
-                                  textTransform: 'none',
-                                  '&:hover': { bgcolor: 'rgba(56, 189, 248, 0.15)', borderColor: '#38BDF8' }
+                                  color: themeColors.accentSecondary,
+                                  borderColor: isLight ? 'rgba(2, 132, 199, 0.4)' : 'rgba(56, 189, 248, 0.4)',
+                                  fontSize: '0.75rem',
+                                  textTransform: 'none'
                                 }}
                               >
-                                View Tax Invoice
+                                View PDF Bill
                               </Button>
                               {bal > 0 && (
                                 <Button
                                   variant="contained"
                                   size="small"
-                                  onClick={() => handleMarkPaid(b)}
                                   disabled={actionLoading}
+                                  onClick={() => handleMarkPaid(b)}
+                                  startIcon={<CheckCircleIcon />}
                                   sx={{
                                     borderRadius: '10px',
                                     fontWeight: 800,
-                                    bgcolor: '#10B981',
-                                    color: '#0B1315',
+                                    bgcolor: themeColors.accentPrimary,
+                                    color: isLight ? '#FFFFFF' : '#0B1315',
+                                    fontSize: '0.75rem',
                                     textTransform: 'none',
-                                    '&:hover': { bgcolor: '#059669' }
+                                    '&:hover': { bgcolor: isLight ? '#007A5A' : '#00A87E' }
                                   }}
                                 >
-                                  Settle Paid
+                                  Mark Paid
                                 </Button>
                               )}
                             </Box>
@@ -386,7 +357,7 @@ export default function BillingOversight() {
         </Paper>
       </Box>
 
-      {/* Dedicated Tax Invoice Receipt Modal */}
+      {/* Invoice Details Dialog */}
       <Dialog
         open={Boolean(selectedInvoice)}
         onClose={() => setSelectedInvoice(null)}
@@ -394,175 +365,118 @@ export default function BillingOversight() {
         fullWidth
         PaperProps={{
           sx: {
-            bgcolor: '#0B1315',
-            color: '#EBF5F3',
-            borderRadius: '20px',
-            border: '1px solid rgba(56, 189, 248, 0.3)',
-            boxShadow: '0 25px 60px rgba(0,0,0,0.85)',
-            backgroundImage: 'radial-gradient(circle at 90% 10%, rgba(56, 189, 248, 0.08) 0%, transparent 60%)'
+            borderRadius: '24px',
+            bgcolor: themeColors.bgPaper,
+            color: themeColors.textPrimary,
+            border: `1px solid ${themeColors.border}`,
+            p: 1
           }
         }}
       >
-        <DialogTitle sx={{ p: 2.5, borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2 }}>
-            <ReceiptLongIcon sx={{ color: '#38BDF8', fontSize: 28 }} />
-            <Box>
-              <Typography variant="h6" sx={{ fontWeight: 900, color: '#EBF5F3' }}>
-                Tax Invoice &amp; Payment Settlement Breakdown
-              </Typography>
-              <Typography variant="caption" sx={{ color: '#38BDF8', fontWeight: 700 }}>
-                Invoice #{selectedInvoice?.billNumber} • Validated GST Healthcare Record
-              </Typography>
-            </Box>
-          </Box>
-          <IconButton onClick={() => setSelectedInvoice(null)} sx={{ color: '#94A8A3' }}>
-            <CloseIcon />
-          </IconButton>
-        </DialogTitle>
-
-        <DialogContent sx={{ p: 3 }}>
-          {selectedInvoice && (
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
-              {/* Doctor & Clinic Header Banner */}
-              <Paper sx={{ p: 2.5, borderRadius: '14px', bgcolor: 'rgba(19, 31, 34, 0.95)', border: '1px solid rgba(56, 189, 248, 0.25)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
-                <Box>
-                  <Typography variant="h6" sx={{ fontWeight: 900, color: '#38BDF8' }}>
-                    {selectedInvoice.doctorName || 'Medizo Multi-Specialty Clinic'}
-                  </Typography>
-                  <Typography variant="body2" sx={{ color: '#EBF5F3', fontWeight: 600 }}>
-                    {selectedInvoice.doctorSpecialization || 'Clinical Practice & Telehealth Services'}
-                  </Typography>
-                  <Typography variant="caption" sx={{ color: '#94A8A3', display: 'block', mt: 0.3 }}>
-                    GSTIN: {selectedInvoice.doctorGstin || '10ADSPZ9708R1Z5'} • SAC 999312 (Healthcare Exemption)
-                  </Typography>
-                </Box>
-                <Box sx={{ textAlign: 'right' }}>
-                  <Chip
-                    label={selectedInvoice.status === 'paid' ? 'PAYMENT SETTLED ✓' : 'PAYMENT PENDING'}
-                    sx={{
-                      bgcolor: selectedInvoice.status === 'paid' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)',
-                      color: selectedInvoice.status === 'paid' ? '#10B981' : '#EF4444',
-                      fontWeight: 800,
-                      border: selectedInvoice.status === 'paid' ? '1px solid #10B981' : '1px solid #EF4444',
-                      mb: 0.5
-                    }}
-                  />
-                  <Typography variant="caption" sx={{ color: '#94A8A3', display: 'block' }}>
-                    Date: {selectedInvoice.createdAt ? new Date(selectedInvoice.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Today'}
-                  </Typography>
-                </Box>
-              </Paper>
-
-              {/* Billed To Patient Strip */}
-              <Grid container spacing={2}>
-                <Grid item xs={12} sm={4}>
-                  <Paper sx={{ p: 1.5, borderRadius: '10px', bgcolor: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                    <Typography variant="caption" sx={{ color: '#94A8A3' }}>Billed To Patient</Typography>
-                    <Typography variant="body2" sx={{ color: '#EBF5F3', fontWeight: 800 }}>
-                      {selectedInvoice.patientName}
-                    </Typography>
-                  </Paper>
-                </Grid>
-                <Grid item xs={6} sm={4}>
-                  <Paper sx={{ p: 1.5, borderRadius: '10px', bgcolor: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                    <Typography variant="caption" sx={{ color: '#94A8A3' }}>Payment Method</Typography>
-                    <Typography variant="body2" sx={{ color: '#C084FC', fontWeight: 800 }}>
-                      {selectedInvoice.paymentMethod || 'UPI / Payment Gateway'}
-                    </Typography>
-                  </Paper>
-                </Grid>
-                <Grid item xs={6} sm={4}>
-                  <Paper sx={{ p: 1.5, borderRadius: '10px', bgcolor: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                    <Typography variant="caption" sx={{ color: '#94A8A3' }}>Transaction Reference</Typography>
-                    <Typography variant="body2" sx={{ color: '#38BDF8', fontWeight: 800, fontFamily: 'monospace' }}>
-                      {selectedInvoice.paymentTransactionRef || `tx_medizo_${selectedInvoice.id || '98234'}`}
-                    </Typography>
-                  </Paper>
-                </Grid>
-              </Grid>
-
-              {/* Line Items Table */}
-              <Paper sx={{ borderRadius: '12px', bgcolor: '#131F22', border: '1px solid rgba(255,255,255,0.08)', overflow: 'hidden' }}>
-                <Box sx={{ p: 1.5, bgcolor: 'rgba(255,255,255,0.03)', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'grid', gridTemplateColumns: '40px 1fr 100px 120px', gap: 1 }}>
-                  <Typography variant="caption" sx={{ color: '#94A8A3', fontWeight: 800 }}>#</Typography>
-                  <Typography variant="caption" sx={{ color: '#94A8A3', fontWeight: 800 }}>Service Description &amp; SAC Code</Typography>
-                  <Typography variant="caption" sx={{ color: '#94A8A3', fontWeight: 800, textAlign: 'center' }}>Qty</Typography>
-                  <Typography variant="caption" sx={{ color: '#94A8A3', fontWeight: 800, textAlign: 'right' }}>Amount (₹)</Typography>
-                </Box>
-
-                {[
-                  { desc: 'Professional Clinical Consultation & Health Check', sac: 'SAC 999312', qty: 1, rate: Number(selectedInvoice.totalAmount) || 500 },
-                  { desc: 'Digital Medical Record & Cloud Telemetry Sync', sac: 'SAC 998314', qty: 1, rate: 0 },
-                  { desc: 'Prescription Digital Signature & QR Verification', sac: 'SAC 999312', qty: 1, rate: 0 }
-                ].map((item, idx) => (
-                  <Box key={idx} sx={{ p: 1.5, borderBottom: '1px solid rgba(255,255,255,0.04)', display: 'grid', gridTemplateColumns: '40px 1fr 100px 120px', gap: 1, alignItems: 'center' }}>
-                    <Typography variant="body2" sx={{ color: '#94A8A3' }}>{idx + 1}</Typography>
-                    <Box>
-                      <Typography variant="body2" sx={{ color: '#EBF5F3', fontWeight: 700 }}>{item.desc}</Typography>
-                      <Typography variant="caption" sx={{ color: '#38BDF8' }}>{item.sac}</Typography>
-                    </Box>
-                    <Typography variant="body2" sx={{ color: '#EBF5F3', textAlign: 'center' }}>{item.qty}</Typography>
-                    <Typography variant="body2" sx={{ color: '#EBF5F3', fontWeight: 800, textAlign: 'right' }}>₹{item.rate.toLocaleString()}</Typography>
-                  </Box>
-                ))}
-
-                {/* Total Summary */}
-                <Box sx={{ p: 2, bgcolor: 'rgba(56, 189, 248, 0.04)', display: 'flex', flexDirection: 'column', gap: 0.8, alignItems: 'flex-end' }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', width: 280 }}>
-                    <Typography variant="body2" sx={{ color: '#94A8A3' }}>Subtotal:</Typography>
-                    <Typography variant="body2" sx={{ color: '#EBF5F3', fontWeight: 700 }}>₹{Number(selectedInvoice.totalAmount || 0).toLocaleString()}</Typography>
-                  </Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', width: 280 }}>
-                    <Typography variant="body2" sx={{ color: '#94A8A3' }}>GST (Healthcare Exempt):</Typography>
-                    <Typography variant="body2" sx={{ color: '#34D399', fontWeight: 700 }}>₹0.00 (Exempt)</Typography>
-                  </Box>
-                  <Divider sx={{ width: 280, my: 0.5, borderColor: 'rgba(255,255,255,0.1)' }} />
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', width: 280 }}>
-                    <Typography variant="subtitle1" sx={{ color: '#38BDF8', fontWeight: 900 }}>Total Invoiced:</Typography>
-                    <Typography variant="subtitle1" sx={{ color: '#34D399', fontWeight: 900 }}>₹{Number(selectedInvoice.totalAmount || 0).toLocaleString()}</Typography>
-                  </Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', width: 280 }}>
-                    <Typography variant="caption" sx={{ color: '#94A8A3' }}>Balance Due:</Typography>
-                    <Typography variant="caption" sx={{ color: selectedInvoice.status === 'paid' ? '#34D399' : '#EF4444', fontWeight: 700 }}>
-                      ₹{selectedInvoice.status === 'paid' ? 0 : Number(selectedInvoice.balanceDue || selectedInvoice.totalAmount).toLocaleString()}
-                    </Typography>
-                  </Box>
-                </Box>
-              </Paper>
-
-              {/* Action Buttons */}
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1.5 }}>
-                <Typography variant="caption" sx={{ color: '#94A8A3' }}>
-                  * This is a computer-generated tax invoice under GST Notification 12/2017 (Central Tax Rate).
+        {selectedInvoice && (
+          <>
+            <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pb: 1, borderBottom: `1px solid ${themeColors.border}` }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <ReceiptLongIcon sx={{ color: themeColors.accentPrimary }} />
+                <Typography variant="h6" sx={{ fontWeight: 900, color: themeColors.textPrimary }}>
+                  Tax Invoice &amp; Consultation Bill #{selectedInvoice.billNumber}
                 </Typography>
-                <Box sx={{ display: 'flex', gap: 1.5 }}>
-                  <Button
-                    variant="contained"
-                    startIcon={<PrintIcon />}
-                    onClick={() => window.print()}
-                    sx={{ bgcolor: '#38BDF8', color: '#0B1315', fontWeight: 800, borderRadius: '10px', textTransform: 'none' }}
-                  >
-                    Print Tax Invoice Receipt
-                  </Button>
-                  <Button
-                    variant="outlined"
-                    startIcon={<ContentCopyIcon />}
-                    onClick={() => {
-                      navigator.clipboard.writeText(JSON.stringify(selectedInvoice, null, 2));
-                      alert('Invoice data copied to clipboard!');
-                    }}
-                    sx={{ color: '#38BDF8', borderColor: '#38BDF8', fontWeight: 700, borderRadius: '10px', textTransform: 'none' }}
-                  >
-                    Copy Invoice Data
-                  </Button>
+              </Box>
+              <IconButton onClick={() => setSelectedInvoice(null)} size="small" sx={{ color: themeColors.textSecondary }}>
+                <CloseIcon />
+              </IconButton>
+            </DialogTitle>
+            <DialogContent sx={{ p: 3 }}>
+              {/* Doctor & Patient Info Header */}
+              <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2.5, mb: 3 }}>
+                <Paper sx={{ p: 2, bgcolor: isLight ? 'rgba(0, 143, 104, 0.08)' : 'rgba(0, 200, 150, 0.05)', borderRadius: '14px', border: isLight ? '1px solid rgba(0, 143, 104, 0.25)' : '1px solid rgba(0, 200, 150, 0.2)' }}>
+                  <Typography variant="caption" sx={{ color: themeColors.accentPrimary, fontWeight: 800, textTransform: 'uppercase' }}>
+                    Consulting Provider
+                  </Typography>
+                  <Typography variant="h6" sx={{ fontWeight: 800, mt: 0.5, color: themeColors.textPrimary }}>
+                    {selectedInvoice.doctorName}
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: themeColors.textSecondary }}>
+                    {selectedInvoice.clinicName || 'Medizo Healthcare Center'}
+                  </Typography>
+                </Paper>
+
+                <Paper sx={{ p: 2, bgcolor: isLight ? 'rgba(2, 132, 199, 0.08)' : 'rgba(56, 189, 248, 0.05)', borderRadius: '14px', border: isLight ? '1px solid rgba(2, 132, 199, 0.25)' : '1px solid rgba(56, 189, 248, 0.2)' }}>
+                  <Typography variant="caption" sx={{ color: themeColors.accentSecondary, fontWeight: 800, textTransform: 'uppercase' }}>
+                    Billed Patient
+                  </Typography>
+                  <Typography variant="h6" sx={{ fontWeight: 800, mt: 0.5, color: themeColors.textPrimary }}>
+                    {selectedInvoice.patientName}
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: themeColors.textSecondary }}>
+                    Billing Date: {new Date(selectedInvoice.createdAt || Date.now()).toLocaleDateString()}
+                  </Typography>
+                </Paper>
+              </Box>
+
+              {/* Items List */}
+              <Typography variant="subtitle2" sx={{ fontWeight: 800, color: themeColors.textSecondary, mb: 1.5 }}>
+                Billed Services &amp; Tariffs
+              </Typography>
+              <TableContainer sx={{ mb: 3 }}>
+                <Table size="small">
+                  <TableHead sx={{ bgcolor: isLight ? '#EBE5D8' : '#0E1719' }}>
+                    <TableRow>
+                      <TableCell sx={{ color: themeColors.textSecondary, fontWeight: 800 }}>Service Description</TableCell>
+                      <TableCell sx={{ color: themeColors.textSecondary, fontWeight: 800 }}>SAC Code</TableCell>
+                      <TableCell sx={{ color: themeColors.textSecondary, fontWeight: 800 }} align="right">Amount</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {(selectedInvoice.items || [{ description: 'Clinical Consultation Fee', sacCode: '999312', amount: selectedInvoice.totalAmount }]).map((item: any, idx: number) => (
+                      <TableRow key={idx} sx={{ '& td': { borderColor: themeColors.border, color: themeColors.textPrimary } }}>
+                        <TableCell sx={{ fontWeight: 700 }}>{item.description}</TableCell>
+                        <TableCell sx={{ color: themeColors.textSecondary }}>{item.sacCode || '999312'}</TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 800 }}>₹{Number(item.amount || 0).toLocaleString()}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+
+              {/* Total Calculation */}
+              <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
+                <Box sx={{ width: 280 }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.8 }}>
+                    <Typography variant="body2" sx={{ color: themeColors.textSecondary }}>Subtotal:</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 700, color: themeColors.textPrimary }}>₹{Number(selectedInvoice.totalAmount || 0).toLocaleString()}</Typography>
+                  </Box>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.8 }}>
+                    <Typography variant="body2" sx={{ color: themeColors.textSecondary }}>GST (SAC 999312 Exempt):</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 700, color: isLight ? '#059669' : '#34D399' }}>₹0.00</Typography>
+                  </Box>
+                  <Divider sx={{ my: 1, borderColor: themeColors.border }} />
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.8 }}>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 900, color: themeColors.textPrimary }}>Grand Total:</Typography>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 900, color: themeColors.accentPrimary }}>₹{Number(selectedInvoice.totalAmount || 0).toLocaleString()}</Typography>
+                  </Box>
                 </Box>
               </Box>
-            </Box>
-          )}
-        </DialogContent>
+
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pt: 2, borderTop: `1px solid ${themeColors.border}` }}>
+                <Button
+                  variant="outlined"
+                  startIcon={<PrintIcon />}
+                  onClick={() => window.print()}
+                  sx={{ color: themeColors.accentPrimary, borderColor: themeColors.accentPrimary, borderRadius: '10px', fontWeight: 700 }}
+                >
+                  Print Tax Invoice
+                </Button>
+                <Button onClick={() => setSelectedInvoice(null)} sx={{ color: themeColors.textSecondary }}>
+                  Close
+                </Button>
+              </Box>
+            </DialogContent>
+          </>
+        )}
       </Dialog>
 
-      {/* User 360 Degree Profile & Activity Graph Popup */}
+      {/* User 360 Profile Modal */}
       <UserDetailModal
         open={Boolean(selectedUser)}
         userId={selectedUser?.id || selectedUser?._id || selectedUser?.email}

@@ -12,7 +12,7 @@ export const adminExtraApi = {
     return response.data;
   },
 
-  createAffiliation: async (data: { nurseId: string; doctorId: string; affiliationType?: string; notes?: string }) => {
+  createAffiliation: async (data: { nurseId: string; doctorId: string; affiliationType?: string; relationshipType?: string; notes?: string }) => {
     const response = await api.post('/admin/affiliations', data);
     return response.data;
   },
