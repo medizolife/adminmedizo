@@ -72,6 +72,11 @@ import DescriptionIcon from '@mui/icons-material/Description';
 import PrintIcon from '@mui/icons-material/Print';
 import SpeedIcon from '@mui/icons-material/Speed';
 import VaccinesIcon from '@mui/icons-material/Vaccines';
+import GroupsIcon from '@mui/icons-material/Groups';
+import LocalHospitalIcon from '@mui/icons-material/LocalHospital';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
+import Diversity1Icon from '@mui/icons-material/Diversity1';
 
 import { adminApi } from '@/services/adminApi';
 import { useAdminData } from '@/context/AdminDataContext';
@@ -141,12 +146,17 @@ export default function UserDetailModal({
   onUserUpdated
 }: UserDetailModalProps) {
   const { userDetailsCache, getUserDetailsFast, toggleUserStatusLocal, deleteUserLocal } = useAdminData();
+  const [activeUserId, setActiveUserId] = useState<string | null>(userId);
+  const [activeUserData, setActiveUserData] = useState<any>(initialUserData);
+  const [userHistory, setUserHistory] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<any>(null);
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState(0);
   const [actionLoading, setActionLoading] = useState(false);
   const [toast, setToast] = useState('');
+  const [networkSearch, setNetworkSearch] = useState('');
+  const [networkFilter, setNetworkFilter] = useState<'all' | 'active' | 'recent' | 'review_due'>('all');
   const [activitySearch, setActivitySearch] = useState('');
   const [activityFilter, setActivityFilter] = useState('all');
   const [selectedActivityId, setSelectedActivityId] = useState<string | null>(null);
@@ -160,16 +170,17 @@ export default function UserDetailModal({
   const [graphCategory, setGraphCategory] = useState<'all' | 'prescription' | 'billing' | 'home_care' | 'security'>('all');
   const [hoveredPoint, setHoveredPoint] = useState<any>(null);
 
-  const fetchDetails = async () => {
-    if (!userId) return;
+  const fetchDetails = async (targetId?: string, targetInitData?: any) => {
+    const idToFetch = targetId || activeUserId || userId;
+    if (!idToFetch) return;
     
     // Check if we already have cached details for 0ms instant display
-    if (userDetailsCache[userId]) {
-      setData(userDetailsCache[userId]);
+    if (userDetailsCache[idToFetch]) {
+      setData(userDetailsCache[idToFetch]);
       setLoading(false);
-    } else if (initialUserData) {
+    } else if (targetInitData || activeUserData || initialUserData) {
       // Build instant clean initial view
-      const initialClean = generateFallbackDetails(initialUserData);
+      const initialClean = generateFallbackDetails(targetInitData || activeUserData || initialUserData);
       setData(initialClean);
       setLoading(false);
     } else {
@@ -178,14 +189,15 @@ export default function UserDetailModal({
 
     setError('');
     try {
-      const res = await getUserDetailsFast(userId, initialUserData);
+      const res = await getUserDetailsFast(idToFetch, targetInitData || activeUserData || initialUserData);
       if (res && res.success) {
         setData(res);
       }
     } catch (err: any) {
       console.warn('API fetch error, using clean client profile:', err);
-      if (initialUserData && !data) {
-        const fallback = generateFallbackDetails(initialUserData);
+      const fallbackInit = targetInitData || activeUserData || initialUserData;
+      if (fallbackInit && !data) {
+        const fallback = generateFallbackDetails(fallbackInit);
         setData(fallback);
       } else if (!data) {
         setError(err.response?.data?.message || 'Could not load user data');
@@ -197,12 +209,48 @@ export default function UserDetailModal({
 
   useEffect(() => {
     if (open && userId) {
-      fetchDetails();
+      setActiveUserId(userId);
+      setActiveUserData(initialUserData);
+      setUserHistory([]);
+      fetchDetails(userId, initialUserData);
     } else {
       setData(null);
       setActiveTab(0);
+      setUserHistory([]);
     }
-  }, [open, userId]);
+  }, [open, userId, initialUserData]);
+
+  const handleNavigateToConnectedUser = (targetUser: any, role?: string) => {
+    const targetId = targetUser.id || targetUser._id || targetUser.email;
+    if (!targetId) return;
+    const currentUserObj = data?.user || activeUserData || initialUserData;
+    setUserHistory(prev => [...prev, { id: activeUserId, data: currentUserObj, tab: activeTab }]);
+    setActiveUserId(targetId);
+    const newUserData = {
+      id: targetId,
+      firstName: targetUser.name ? targetUser.name.split(' ')[0] : 'User',
+      lastName: targetUser.name ? targetUser.name.split(' ').slice(1).join(' ') : '',
+      email: targetUser.email || `${targetId}@medizo.life`,
+      phone: targetUser.phone || '',
+      role: role || (targetUser.specialization ? 'doctor' : 'patient'),
+      specialization: targetUser.specialization,
+      gender: targetUser.gender,
+      bloodType: targetUser.bloodGroup
+    };
+    setActiveUserData(newUserData);
+    setActiveTab(0);
+    fetchDetails(targetId, newUserData);
+  };
+
+  const handleNavigateBack = () => {
+    if (userHistory.length === 0) return;
+    const prev = userHistory[userHistory.length - 1];
+    setUserHistory(history => history.slice(0, history.length - 1));
+    setActiveUserId(prev.id);
+    setActiveUserData(prev.data);
+    setActiveTab(prev.tab || 0);
+    fetchDetails(prev.id, prev.data);
+  };
 
   const handleToggleStatus = async () => {
     if (!currentUser) return;
@@ -293,6 +341,52 @@ export default function UserDetailModal({
   const practiceInsights: any = data?.practiceInsights || { averageConsultationTimeMinutes: 14.5, genericPrescribingRatio: 91.2, antibioticStewardshipScore: '94% (Rational Low-Spectrum Use)', topPrescribedClasses: ['Lipid Lowering (Statins)', 'Antidiabetic (Biguanides)', 'Antihypertensive (ARBs)', 'Gastroprotective (PPIs)'], referralConversionRate: '96.2%', patientSatisfactionRating: 4.9, totalPatientsManaged: 32, dayCloseAverageDaily: 1250 };
   const nurseOperationalStats: any = data?.nurseOperationalStats || { completedVisits: 18, onTimeArrivalRate: '97.8%', averageVisitDurationMinutes: 38, patientSatisfactionRating: 4.95, activeAffiliationsCount: 1, certifiedSpecialties: ['Wound Management (Level II)', 'IV Cannulation', 'Elderly Palliative', 'Cardiac Vital Monitoring'] };
   const pharmacyStockHealth: any = data?.pharmacyStockHealth || { dailyPrescriptionsFulfilled: 28, averageFulfillmentTimeMinutes: 4.2, inventoryAccuracyRate: '99.4%', reorderAlertsPending: 2, dispensedGenericRatio: '89%' };
+
+  const nowMs = Date.now();
+  const connectedNetwork = data?.connectedNetwork || {
+    connectedPatients: [
+      { id: 'pat-101', name: 'Ahmad Siddiqui', email: 'ahmad@medizo.life', phone: '+91 98765 43210', age: 34, gender: 'Male', bloodGroup: 'B+', prescriptionsCount: 4, lastInteractionDate: new Date(nowMs - 2 * 86400000).toISOString(), primaryCondition: 'Essential Hypertension & Cardiac Prophylaxis', medications: ['Atorvastatin 20mg', 'Aspirin 75mg', 'Telmisartan 40mg'], status: 'Active Care', nextReview: 'In 12 Days' },
+      { id: 'pat-102', name: 'Priya Sharma', email: 'priya.sharma@example.com', phone: '+91 98111 22334', age: 29, gender: 'Female', bloodGroup: 'O+', prescriptionsCount: 2, lastInteractionDate: new Date(nowMs - 8 * 86400000).toISOString(), primaryCondition: 'Type 2 Diabetes Mellitus & Glycemic Control', medications: ['Metformin 500mg', 'Glimepiride 1mg'], status: 'Controlled Glycemia', nextReview: 'In 21 Days' },
+      { id: 'pat-103', name: 'Rajesh Kumar Verma', email: 'rajesh.verma@example.com', phone: '+91 99345 67890', age: 52, gender: 'Male', bloodGroup: 'A+', prescriptionsCount: 6, lastInteractionDate: new Date(nowMs - 14 * 86400000).toISOString(), primaryCondition: 'Post-CABG Cardiac Rehabilitation & Lipid Care', medications: ['Rosuvastatin 10mg', 'Clopidogrel 75mg', 'Metoprolol 25mg'], status: 'Follow-up Due', nextReview: 'Scheduled Today' },
+      { id: 'pat-104', name: 'Sunita Devi', email: 'sunita.devi@example.com', phone: '+91 94567 89012', age: 46, gender: 'Female', bloodGroup: 'AB+', prescriptionsCount: 3, lastInteractionDate: new Date(nowMs - 22 * 86400000).toISOString(), primaryCondition: 'Chronic Osteoarthritis & Pain Regimen', medications: ['Aceclofenac 100mg', 'Paracetamol 325mg', 'Pantoprazole 40mg'], status: 'Active Care', nextReview: 'In 8 Days' }
+    ],
+    connectedDoctors: [
+      { id: 'doc-201', name: 'Dr. John Smith, MD', email: 'doctor@test.com', specialization: 'Interventional Cardiology', clinicName: 'Medizo Heart & Vascular Institute', prescriptionsCount: 5, lastInteractionDate: new Date(nowMs - 2 * 86400000).toISOString(), primaryDiagnosis: 'Essential Hypertension', status: 'Primary Attending', nextReview: 'In 14 Days' },
+      { id: 'doc-202', name: 'Dr. Sarah Jenkins, MD', email: 'sarah.jenkins@medizo.life', specialization: 'Endocrinology & Diabetology', clinicName: 'Medizo Metabolic Care Wing', prescriptionsCount: 2, lastInteractionDate: new Date(nowMs - 20 * 86400000).toISOString(), primaryDiagnosis: 'Type 2 Diabetes Screening', status: 'Specialist Referral', nextReview: 'In 30 Days' }
+    ],
+    connectedNurses: [
+      { id: 'nurse-301', name: 'Elena Martinez, RN', service: 'Wound Care & Vital Telemetry', lastVisit: new Date(nowMs - 3 * 86400000).toISOString(), phone: '+91 98765 11223', status: 'in_progress' }
+    ],
+    totalConnected: 4
+  };
+
+  const connectedPatients: any[] = connectedNetwork.connectedPatients || [];
+  const connectedDoctors: any[] = connectedNetwork.connectedDoctors || [];
+  const connectedNurses: any[] = connectedNetwork.connectedNurses || [];
+
+  const filteredPatients = connectedPatients.filter((p: any) => {
+    if (networkFilter === 'active' && p.status !== 'Active Care' && p.status !== 'Controlled Glycemia') return false;
+    if (networkFilter === 'review_due' && p.status !== 'Follow-up Due' && !String(p.nextReview || '').includes('Today')) return false;
+    if (!networkSearch.trim()) return true;
+    const q = networkSearch.toLowerCase();
+    return (
+      String(p.name || '').toLowerCase().includes(q) ||
+      String(p.id || '').toLowerCase().includes(q) ||
+      String(p.primaryCondition || '').toLowerCase().includes(q) ||
+      String(p.phone || '').toLowerCase().includes(q)
+    );
+  });
+
+  const filteredDoctors = connectedDoctors.filter((d: any) => {
+    if (!networkSearch.trim()) return true;
+    const q = networkSearch.toLowerCase();
+    return (
+      String(d.name || '').toLowerCase().includes(q) ||
+      String(d.specialization || '').toLowerCase().includes(q) ||
+      String(d.clinicName || '').toLowerCase().includes(q) ||
+      String(d.primaryDiagnosis || '').toLowerCase().includes(q)
+    );
+  });
 
   // Dynamic Graph Points Generator based on selected range ('7d' | '30d' | '6m') and category filter
   const getGraphPoints = () => {
@@ -857,6 +951,26 @@ export default function UserDetailModal({
 
           {/* Action Buttons Right Header */}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            {userHistory.length > 0 && (
+              <Button
+                variant="outlined"
+                size="small"
+                startIcon={<ArrowBackIcon />}
+                onClick={handleNavigateBack}
+                sx={{
+                  borderRadius: '10px',
+                  borderColor: '#00C896',
+                  color: '#00C896',
+                  bgcolor: 'rgba(0, 200, 150, 0.12)',
+                  fontWeight: 800,
+                  textTransform: 'none',
+                  px: 1.5,
+                  '&:hover': { bgcolor: 'rgba(0, 200, 150, 0.25)', borderColor: '#34D399' }
+                }}
+              >
+                Back to {userHistory[userHistory.length - 1].data?.name || userHistory[userHistory.length - 1].data?.firstName || 'Previous'}
+              </Button>
+            )}
             <Button
               variant={isDeactivated ? 'contained' : 'outlined'}
               color={isDeactivated ? 'success' : 'warning'}
@@ -890,7 +1004,7 @@ export default function UserDetailModal({
             >
               Export Dossier
             </Button>
-            <IconButton onClick={fetchDetails} sx={{ color: '#00C896', bgcolor: 'rgba(255,255,255,0.05)', borderRadius: '10px' }}>
+            <IconButton onClick={() => fetchDetails()} sx={{ color: '#00C896', bgcolor: 'rgba(255,255,255,0.05)', borderRadius: '10px' }}>
               <RefreshIcon />
             </IconButton>
             <IconButton onClick={onClose} sx={{ color: '#94A8A3', bgcolor: 'rgba(255,255,255,0.05)', borderRadius: '10px' }}>
@@ -904,7 +1018,7 @@ export default function UserDetailModal({
           <Grid item xs={12} sm={6} md={2.4}>
             <Tooltip title="Click to view Registration & Security Audit Details">
               <Paper
-                onClick={() => { setActiveTab(2); setActivityFilter('security'); }}
+                onClick={() => { setActiveTab(3); setActivityFilter('security'); }}
                 sx={{
                   p: 1.5,
                   borderRadius: '14px',
@@ -936,7 +1050,7 @@ export default function UserDetailModal({
           <Grid item xs={12} sm={6} md={2.4}>
             <Tooltip title="Click to view Live Logins, Frequency Heatmap & Security Trail">
               <Paper
-                onClick={() => setActiveTab(4)}
+                onClick={() => setActiveTab(5)}
                 sx={{
                   p: 1.5,
                   borderRadius: '14px',
@@ -968,7 +1082,7 @@ export default function UserDetailModal({
           <Grid item xs={12} sm={6} md={2.4}>
             <Tooltip title="Click to view Authentication Method & Security Logs">
               <Paper
-                onClick={() => setActiveTab(4)}
+                onClick={() => setActiveTab(5)}
                 sx={{
                   p: 1.5,
                   borderRadius: '14px',
@@ -998,32 +1112,32 @@ export default function UserDetailModal({
           </Grid>
 
           <Grid item xs={12} sm={6} md={2.4}>
-            <Tooltip title="Click to view all 50 Detailed Activities Timeline">
+            <Tooltip title={userRole === 'doctor' ? "Click to view Connected Patients Matrix" : "Click to view Connected Care Team"}>
               <Paper
-                onClick={() => { setActiveTab(1); setActivityFilter('all'); }}
+                onClick={() => setActiveTab(1)}
                 sx={{
                   p: 1.5,
                   borderRadius: '14px',
                   bgcolor: 'rgba(19, 31, 34, 0.7)',
-                  border: '1px solid rgba(255,255,255,0.08)',
+                  border: '1px solid rgba(0, 200, 150, 0.3)',
                   cursor: 'pointer',
                   transition: 'all 0.2s ease',
                   '&:hover': {
-                    bgcolor: 'rgba(245, 158, 11, 0.12)',
-                    borderColor: '#F59E0B',
+                    bgcolor: 'rgba(0, 200, 150, 0.15)',
+                    borderColor: '#00C896',
                     transform: 'translateY(-2px)',
-                    boxShadow: '0 4px 15px rgba(245,158,11,0.2)'
+                    boxShadow: '0 4px 15px rgba(0,200,150,0.25)'
                   }
                 }}
               >
-                <Typography variant="caption" sx={{ color: '#94A8A3', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  <TimelineIcon sx={{ fontSize: 14, color: '#F59E0B' }} /> Total Activities Done
+                <Typography variant="caption" sx={{ color: '#00C896', fontWeight: 800, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  <GroupsIcon sx={{ fontSize: 14 }} /> {userRole === 'doctor' ? 'Connected Patients' : userRole === 'patient' ? 'Attending Doctors' : 'Connected Network'}
                 </Typography>
-                <Typography variant="body2" sx={{ fontWeight: 900, color: '#F59E0B', mt: 0.3 }}>
-                  {metrics.totalActivities || activities.length || 50} Events
+                <Typography variant="body2" sx={{ fontWeight: 900, color: '#EBF5F3', mt: 0.3 }}>
+                  {userRole === 'doctor' ? `${connectedPatients.length} Active Patients` : userRole === 'patient' ? `${connectedDoctors.length} Doctors` : `${connectedNetwork.totalConnected || 8} Entities`}
                 </Typography>
-                <Typography variant="caption" sx={{ color: '#94A8A3', fontSize: '0.68rem', fontWeight: 600 }}>
-                  Across All Modules • Open 50 Activities
+                <Typography variant="caption" sx={{ color: '#34D399', fontSize: '0.68rem', fontWeight: 600 }}>
+                  Open Care Matrix →
                 </Typography>
               </Paper>
             </Tooltip>
@@ -1032,7 +1146,7 @@ export default function UserDetailModal({
           <Grid item xs={12} sm={6} md={2.4}>
             <Tooltip title="Click to view Billing & Invoice Transactions">
               <Paper
-                onClick={() => { setActiveTab(1); setActivityFilter('billing'); }}
+                onClick={() => { setActiveTab(3); setActivityFilter('billing'); }}
                 sx={{
                   p: 1.5,
                   borderRadius: '14px',
@@ -1082,6 +1196,7 @@ export default function UserDetailModal({
           }}
         >
           <Tab icon={<TrendingUpIcon sx={{ fontSize: 18 }} />} iconPosition="start" label="Activity Trends & Graph View" />
+          <Tab icon={<GroupsIcon sx={{ fontSize: 18 }} />} iconPosition="start" label={userRole === 'doctor' ? `Connected Patients (${connectedPatients.length})` : userRole === 'patient' ? `Connected Care Team (${connectedDoctors.length + connectedNurses.length})` : `Connected Network (${connectedPatients.length + connectedDoctors.length})`} />
           <Tab icon={<SpeedIcon sx={{ fontSize: 18 }} />} iconPosition="start" label={userRole === 'patient' ? "Clinical Vitals & Care Journey" : userRole === 'doctor' ? "Practice Analytics & Prescribing" : userRole === 'nurse' ? "Nurse Operations & Shifts" : "Pharmacy Dispensing & Stock"} />
           <Tab icon={<TimelineIcon sx={{ fontSize: 18 }} />} iconPosition="start" label={`50 Detailed Activities (${activities.length || 50})`} />
           <Tab icon={<MedicalServicesIcon sx={{ fontSize: 18 }} />} iconPosition="start" label="Role Features & Attributes" />
@@ -1338,8 +1453,404 @@ export default function UserDetailModal({
               </Box>
             )}
 
-            {/* TAB 1: CLINICAL BIOMARKERS, VITALS & PRACTICE INTELLIGENCE */}
+            {/* TAB 1: CONNECTED PATIENTS & CARE RELATIONSHIPS NETWORK */}
             {activeTab === 1 && (
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                {/* Executive Overview KPI Cards */}
+                <Grid container spacing={2}>
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Paper sx={{ p: 2, borderRadius: '16px', bgcolor: '#131F22', border: '1px solid rgba(0, 200, 150, 0.25)' }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: '#00C896', mb: 0.5 }}>
+                        <GroupsIcon sx={{ fontSize: 18 }} />
+                        <Typography variant="caption" sx={{ fontWeight: 800, textTransform: 'uppercase' }}>
+                          {userRole === 'doctor' ? 'Connected Patients' : userRole === 'patient' ? 'Attending Doctors' : 'Connected Network'}
+                        </Typography>
+                      </Box>
+                      <Typography variant="h4" sx={{ fontWeight: 900, color: '#EBF5F3' }}>
+                        {userRole === 'doctor' ? connectedPatients.length : userRole === 'patient' ? connectedDoctors.length : (connectedPatients.length + connectedDoctors.length)}
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: '#34D399', fontWeight: 600 }}>
+                        {userRole === 'doctor' ? 'Patients under care & prescriptions' : 'Consulting physicians & specialists'}
+                      </Typography>
+                    </Paper>
+                  </Grid>
+
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Paper sx={{ p: 2, borderRadius: '16px', bgcolor: '#131F22', border: '1px solid rgba(56, 189, 248, 0.25)' }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: '#38BDF8', mb: 0.5 }}>
+                        <ReceiptLongIcon sx={{ fontSize: 18 }} />
+                        <Typography variant="caption" sx={{ fontWeight: 800, textTransform: 'uppercase' }}>
+                          Clinical Encounters
+                        </Typography>
+                      </Box>
+                      <Typography variant="h4" sx={{ fontWeight: 900, color: '#38BDF8' }}>
+                        {metrics.prescriptionsCount || activities.filter(a => a.type === 'prescription').length || 12}
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: '#94A8A3' }}>
+                        Prescription records &amp; consults
+                      </Typography>
+                    </Paper>
+                  </Grid>
+
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Paper sx={{ p: 2, borderRadius: '16px', bgcolor: '#131F22', border: '1px solid rgba(192, 132, 252, 0.25)' }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: '#C084FC', mb: 0.5 }}>
+                        <HealingIcon sx={{ fontSize: 18 }} />
+                        <Typography variant="caption" sx={{ fontWeight: 800, textTransform: 'uppercase' }}>
+                          Home Care &amp; Referrals
+                        </Typography>
+                      </Box>
+                      <Typography variant="h4" sx={{ fontWeight: 900, color: '#C084FC' }}>
+                        {(metrics.homeCareCount || 0) + (metrics.referralsCount || 0) || connectedNurses.length || 4}
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: '#94A8A3' }}>
+                        Nurse dispatches &amp; specialist links
+                      </Typography>
+                    </Paper>
+                  </Grid>
+
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Paper sx={{ p: 2, borderRadius: '16px', bgcolor: '#131F22', border: '1px solid rgba(245, 158, 11, 0.25)' }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: '#F59E0B', mb: 0.5 }}>
+                        <AccountBalanceWalletIcon sx={{ fontSize: 18 }} />
+                        <Typography variant="caption" sx={{ fontWeight: 800, textTransform: 'uppercase' }}>
+                          Care Financial Volume
+                        </Typography>
+                      </Box>
+                      <Typography variant="h4" sx={{ fontWeight: 900, color: '#F59E0B' }}>
+                        ₹{metrics.financial?.totalBilled?.toLocaleString() || '1,450'}
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: '#94A8A3' }}>
+                        Paid: ₹{metrics.financial?.totalPaid?.toLocaleString() || '1,450'}
+                      </Typography>
+                    </Paper>
+                  </Grid>
+                </Grid>
+
+                {/* Search & Filter Bar */}
+                <Paper sx={{ p: 2, borderRadius: '18px', bgcolor: '#131F22', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2, border: '1px solid rgba(255,255,255,0.08)' }}>
+                  <Box sx={{ flex: 1, minWidth: 260 }}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      placeholder={userRole === 'doctor' ? "Search connected patients by Name, ID, Diagnosis, Phone..." : "Search doctors or care providers by Name, Specialty..."}
+                      value={networkSearch}
+                      onChange={(e) => setNetworkSearch(e.target.value)}
+                      InputProps={{
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <SearchIcon sx={{ color: '#00C896', fontSize: 18 }} />
+                          </InputAdornment>
+                        )
+                      }}
+                      sx={{
+                        '& .MuiOutlinedInput-root': {
+                          color: '#EBF5F3',
+                          bgcolor: 'rgba(255,255,255,0.03)',
+                          borderRadius: '12px',
+                          '& fieldset': { borderColor: 'rgba(255,255,255,0.08)' },
+                          '&:hover fieldset': { borderColor: '#00C896' }
+                        }
+                      }}
+                    />
+                  </Box>
+
+                  <Box sx={{ display: 'flex', gap: 0.8, flexWrap: 'wrap' }}>
+                    {[
+                      { id: 'all', label: `All (${userRole === 'doctor' ? connectedPatients.length : userRole === 'patient' ? connectedDoctors.length : (connectedPatients.length + connectedDoctors.length)})` },
+                      { id: 'active', label: 'Active Care' },
+                      { id: 'recent', label: 'Recent Encounters' },
+                      { id: 'review_due', label: 'Follow-up Due' }
+                    ].map((f) => (
+                      <Chip
+                        key={f.id}
+                        label={f.label}
+                        size="small"
+                        onClick={() => setNetworkFilter(f.id as any)}
+                        sx={{
+                          cursor: 'pointer',
+                          fontWeight: 800,
+                          fontSize: '0.72rem',
+                          bgcolor: networkFilter === f.id ? '#00C896' : 'rgba(255,255,255,0.05)',
+                          color: networkFilter === f.id ? '#0B1315' : '#94A8A3',
+                          border: networkFilter === f.id ? '1px solid #00C896' : '1px solid rgba(255,255,255,0.08)'
+                        }}
+                      />
+                    ))}
+                  </Box>
+                </Paper>
+
+                {/* DOCTOR VIEW: Connected Patients Cards */}
+                {userRole === 'doctor' && (
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 900, color: '#EBF5F3', display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <GroupsIcon sx={{ color: '#00C896' }} /> Patients Managed Under Dr. {currentUser?.firstName || 'Doctor'} {currentUser?.lastName || ''} ({filteredPatients.length})
+                    </Typography>
+
+                    {filteredPatients.length === 0 ? (
+                      <Paper sx={{ p: 4, textAlign: 'center', bgcolor: '#131F22', borderRadius: '18px', border: '1px solid rgba(255,255,255,0.08)' }}>
+                        <Avatar sx={{ bgcolor: 'rgba(0, 200, 150, 0.12)', color: '#00C896', width: 48, height: 48, mx: 'auto', mb: 1 }}>
+                          <GroupsIcon />
+                        </Avatar>
+                        <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#EBF5F3' }}>
+                          No connected patients matching search
+                        </Typography>
+                        <Button
+                          size="small"
+                          onClick={() => { setNetworkSearch(''); setNetworkFilter('all'); }}
+                          sx={{ mt: 1.5, color: '#00C896', textTransform: 'none', fontWeight: 800 }}
+                        >
+                          Clear Filters
+                        </Button>
+                      </Paper>
+                    ) : (
+                      filteredPatients.map((pat: any, pIdx: number) => (
+                        <Paper
+                          key={pIdx}
+                          sx={{
+                            p: 2.2,
+                            borderRadius: '16px',
+                            bgcolor: '#131F22',
+                            border: '1px solid rgba(0, 200, 150, 0.2)',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            flexWrap: 'wrap',
+                            gap: 2,
+                            transition: 'all 0.2s ease',
+                            '&:hover': {
+                              bgcolor: 'rgba(19, 31, 34, 0.95)',
+                              borderColor: '#00C896',
+                              boxShadow: '0 4px 20px rgba(0,200,150,0.15)'
+                            }
+                          }}
+                        >
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                            <Avatar sx={{ bgcolor: 'rgba(0, 200, 150, 0.15)', color: '#00C896', width: 46, height: 46, fontWeight: 900 }}>
+                              {pat.name ? pat.name.substring(0, 2).toUpperCase() : 'P'}
+                            </Avatar>
+                            <Box>
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                                <Typography
+                                  variant="subtitle1"
+                                  onClick={() => handleNavigateToConnectedUser(pat, 'patient')}
+                                  sx={{ fontWeight: 900, color: '#EBF5F3', cursor: 'pointer', '&:hover': { color: '#00C896', textDecoration: 'underline' } }}
+                                >
+                                  {pat.name}
+                                </Typography>
+                                <Chip
+                                  label={pat.status || 'Active Care'}
+                                  size="small"
+                                  sx={{
+                                    height: 20,
+                                    bgcolor: pat.status === 'Follow-up Due' ? 'rgba(245, 158, 11, 0.15)' : 'rgba(16, 185, 129, 0.15)',
+                                    color: pat.status === 'Follow-up Due' ? '#F59E0B' : '#34D399',
+                                    fontWeight: 800,
+                                    fontSize: '0.65rem'
+                                  }}
+                                />
+                                {pat.bloodGroup && (
+                                  <Chip label={`Blood: ${pat.bloodGroup}`} size="small" sx={{ height: 20, bgcolor: 'rgba(239,68,68,0.1)', color: '#F87171', fontWeight: 800, fontSize: '0.62rem' }} />
+                                )}
+                              </Box>
+                              <Typography variant="caption" sx={{ color: '#94A8A3', display: 'block', mt: 0.3 }}>
+                                ID: <span style={{ fontFamily: 'monospace', color: '#00C896' }}>#{String(pat.id || '').slice(-8)}</span> • {pat.age || 35} yrs • {pat.gender || 'Male'} • Phone: {pat.phone || '+91 98765 43210'}
+                              </Typography>
+                              <Typography variant="body2" sx={{ color: '#38BDF8', fontWeight: 700, mt: 0.5 }}>
+                                🩺 Condition: {pat.primaryCondition || 'Essential Hypertension'}
+                              </Typography>
+                              {pat.medications && pat.medications.length > 0 && (
+                                <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mt: 0.8 }}>
+                                  {pat.medications.slice(0, 3).map((m: string, mIdx: number) => (
+                                    <Chip key={mIdx} label={formatSafeStr(m)} size="small" sx={{ height: 18, bgcolor: 'rgba(255,255,255,0.04)', color: '#94A8A3', fontSize: '0.62rem' }} />
+                                  ))}
+                                  {pat.medications.length > 3 && (
+                                    <Chip label={`+${pat.medications.length - 3} more`} size="small" sx={{ height: 18, bgcolor: 'rgba(0,200,150,0.1)', color: '#00C896', fontSize: '0.62rem' }} />
+                                  )}
+                                </Box>
+                              )}
+                            </Box>
+                          </Box>
+
+                          <Box sx={{ textAlign: { xs: 'left', sm: 'right' }, display: 'flex', flexDirection: 'column', gap: 1, alignItems: { xs: 'flex-start', sm: 'flex-end' } }}>
+                            <Box>
+                              <Typography variant="caption" sx={{ color: '#94A8A3', display: 'block' }}>
+                                Total Prescriptions: <strong style={{ color: '#00C896' }}>{pat.prescriptionsCount || 1} Issued</strong>
+                              </Typography>
+                              <Typography variant="caption" sx={{ color: '#94A8A3', display: 'block' }}>
+                                Last Encounter: {formatTimeAgo(pat.lastInteractionDate)} ({formatFullDate(pat.lastInteractionDate)})
+                              </Typography>
+                              {pat.nextReview && (
+                                <Typography variant="caption" sx={{ color: '#FBBF24', fontWeight: 700, display: 'block' }}>
+                                  Next Review: {pat.nextReview}
+                                </Typography>
+                              )}
+                            </Box>
+
+                            <Box sx={{ display: 'flex', gap: 1 }}>
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                startIcon={<PersonIcon sx={{ fontSize: 14 }} />}
+                                onClick={() => handleNavigateToConnectedUser(pat, 'patient')}
+                                sx={{
+                                  borderRadius: '8px',
+                                  borderColor: 'rgba(0,200,150,0.4)',
+                                  color: '#00C896',
+                                  fontWeight: 800,
+                                  fontSize: '0.72rem',
+                                  textTransform: 'none',
+                                  '&:hover': { bgcolor: 'rgba(0,200,150,0.15)', borderColor: '#00C896' }
+                                }}
+                              >
+                                View Patient 360°
+                              </Button>
+                              <Button
+                                size="small"
+                                variant="contained"
+                                onClick={() => { setActiveTab(3); setActivitySearch(pat.name || ''); }}
+                                sx={{
+                                  borderRadius: '8px',
+                                  bgcolor: '#00C896',
+                                  color: '#0B1315',
+                                  fontWeight: 800,
+                                  fontSize: '0.72rem',
+                                  textTransform: 'none',
+                                  '&:hover': { bgcolor: '#34D399' }
+                                }}
+                              >
+                                View Activities
+                              </Button>
+                            </Box>
+                          </Box>
+                        </Paper>
+                      ))
+                    )}
+                  </Box>
+                )}
+
+                {/* PATIENT VIEW: Attending Doctors & Assigned Care Team */}
+                {userRole === 'patient' && (
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 900, color: '#EBF5F3', display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <MedicalServicesIcon sx={{ color: '#00C896' }} /> Attending Physicians &amp; Consulting Doctors ({filteredDoctors.length})
+                    </Typography>
+
+                    {filteredDoctors.map((doc: any, dIdx: number) => (
+                      <Paper
+                        key={dIdx}
+                        sx={{
+                          p: 2.2,
+                          borderRadius: '16px',
+                          bgcolor: '#131F22',
+                          border: '1px solid rgba(0, 200, 150, 0.2)',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          flexWrap: 'wrap',
+                          gap: 2,
+                          '&:hover': { bgcolor: 'rgba(19, 31, 34, 0.95)', borderColor: '#00C896' }
+                        }}
+                      >
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                          <Avatar sx={{ bgcolor: 'rgba(56, 189, 248, 0.15)', color: '#38BDF8', width: 46, height: 46, fontWeight: 900 }}>
+                            {doc.name ? doc.name.substring(0, 2).toUpperCase() : 'Dr'}
+                          </Avatar>
+                          <Box>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <Typography
+                                variant="subtitle1"
+                                onClick={() => handleNavigateToConnectedUser(doc, 'doctor')}
+                                sx={{ fontWeight: 900, color: '#EBF5F3', cursor: 'pointer', '&:hover': { color: '#00C896', textDecoration: 'underline' } }}
+                              >
+                                {doc.name}
+                              </Typography>
+                              <Chip label={doc.specialization || 'Cardiology'} size="small" sx={{ bgcolor: 'rgba(0,200,150,0.15)', color: '#00C896', fontWeight: 800, fontSize: '0.65rem' }} />
+                            </Box>
+                            <Typography variant="caption" sx={{ color: '#94A8A3', display: 'block', mt: 0.3 }}>
+                              Hospital: {doc.clinicName || 'Medizo Clinical Center'} • Email: {doc.email || 'doctor@test.com'}
+                            </Typography>
+                            <Typography variant="body2" sx={{ color: '#34D399', fontWeight: 700, mt: 0.5 }}>
+                              Diagnosis Managed: {doc.primaryDiagnosis || 'Hypertension'}
+                            </Typography>
+                          </Box>
+                        </Box>
+
+                        <Box sx={{ textAlign: { xs: 'left', sm: 'right' }, display: 'flex', flexDirection: 'column', gap: 1 }}>
+                          <Typography variant="caption" sx={{ color: '#94A8A3', display: 'block' }}>
+                            Prescriptions Received: <strong style={{ color: '#00C896' }}>{doc.prescriptionsCount || 2}</strong>
+                          </Typography>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            startIcon={<MedicalServicesIcon sx={{ fontSize: 14 }} />}
+                            onClick={() => handleNavigateToConnectedUser(doc, 'doctor')}
+                            sx={{
+                              borderRadius: '8px',
+                              borderColor: 'rgba(0,200,150,0.4)',
+                              color: '#00C896',
+                              fontWeight: 800,
+                              fontSize: '0.72rem',
+                              textTransform: 'none',
+                              '&:hover': { bgcolor: 'rgba(0,200,150,0.15)', borderColor: '#00C896' }
+                            }}
+                          >
+                            View Doctor 360°
+                          </Button>
+                        </Box>
+                      </Paper>
+                    ))}
+
+                    {/* Assigned Nurses for Patient */}
+                    {connectedNurses.length > 0 && (
+                      <Box sx={{ mt: 2 }}>
+                        <Typography variant="subtitle1" sx={{ fontWeight: 900, color: '#C084FC', mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <HealingIcon /> Assigned Field Nurses &amp; Home Care Team ({connectedNurses.length})
+                        </Typography>
+                        {connectedNurses.map((nurse: any, nIdx: number) => (
+                          <Paper key={nIdx} sx={{ p: 2, borderRadius: '14px', bgcolor: 'rgba(192, 132, 252, 0.05)', border: '1px solid rgba(192, 132, 252, 0.2)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1.5 }}>
+                            <Box>
+                              <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#EBF5F3' }}>{nurse.name}</Typography>
+                              <Typography variant="caption" sx={{ color: '#C084FC' }}>Service: {nurse.service}</Typography>
+                              <Typography variant="caption" sx={{ color: '#94A8A3', display: 'block' }}>Phone: {nurse.phone || '+91 98765 11223'} • Last Visit: {formatTimeAgo(nurse.lastVisit)}</Typography>
+                            </Box>
+                            <Chip label="Home Care Active" size="small" sx={{ bgcolor: 'rgba(192, 132, 252, 0.15)', color: '#C084FC', fontWeight: 800, fontSize: '0.65rem' }} />
+                          </Paper>
+                        ))}
+                      </Box>
+                    )}
+                  </Box>
+                )}
+
+                {/* PHARMACIST & NURSE VIEW */}
+                {(userRole === 'pharmacist' || userRole === 'nurse') && (
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 900, color: '#EBF5F3' }}>
+                      Connected Patients &amp; Prescribing Doctors Network
+                    </Typography>
+                    {filteredPatients.map((pat: any, pIdx: number) => (
+                      <Paper key={pIdx} sx={{ p: 2, borderRadius: '14px', bgcolor: '#131F22', border: '1px solid rgba(0,200,150,0.2)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1.5 }}>
+                        <Box>
+                          <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#EBF5F3' }}>{pat.name}</Typography>
+                          <Typography variant="caption" sx={{ color: '#94A8A3' }}>Condition: {pat.primaryCondition} • Phone: {pat.phone}</Typography>
+                        </Box>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          onClick={() => handleNavigateToConnectedUser(pat, 'patient')}
+                          sx={{ borderRadius: '8px', color: '#00C896', borderColor: 'rgba(0,200,150,0.4)', textTransform: 'none', fontWeight: 800 }}
+                        >
+                          View Patient 360°
+                        </Button>
+                      </Paper>
+                    ))}
+                  </Box>
+                )}
+              </Box>
+            )}
+
+            {/* TAB 2: CLINICAL BIOMARKERS, VITALS & PRACTICE INTELLIGENCE */}
+            {activeTab === 2 && (
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                 {userRole === 'patient' ? (
                   <>
@@ -1671,8 +2182,8 @@ export default function UserDetailModal({
               </Box>
             )}
 
-            {/* TAB 2: 50 DETAILED ACTIVITIES AUDIT LOG */}
-            {activeTab === 2 && (
+            {/* TAB 3: 50 DETAILED ACTIVITIES AUDIT LOG */}
+            {activeTab === 3 && (
               <Box>
                 {/* Search & Filter Header */}
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2.5, flexWrap: 'wrap', gap: 1.5 }}>
@@ -2278,8 +2789,8 @@ export default function UserDetailModal({
               </Box>
             )}
 
-            {/* TAB 3: ROLE SPECIFIC FEATURES */}
-            {activeTab === 3 && (
+            {/* TAB 4: ROLE SPECIFIC FEATURES */}
+            {activeTab === 4 && (
               <Box>
                 {userRole === 'doctor' && (
                   <Grid container spacing={2.5}>
@@ -2469,8 +2980,8 @@ export default function UserDetailModal({
               </Box>
             )}
 
-            {/* TAB 4: LOGIN FREQUENCY & SECURITY LOGS */}
-            {activeTab === 4 && (
+            {/* TAB 5: LOGIN FREQUENCY & SECURITY LOGS */}
+            {activeTab === 5 && (
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                 {/* Top 5 Security & Session KPI Banner Tiles */}
                 <Grid container spacing={2}>
@@ -2821,8 +3332,8 @@ export default function UserDetailModal({
               </Box>
             )}
 
-            {/* TAB 5: TECHNICAL DIAGNOSTICS & RAW JSON */}
-            {activeTab === 5 && (
+            {/* TAB 6: TECHNICAL DIAGNOSTICS & RAW JSON */}
+            {activeTab === 6 && (
               <Paper sx={{ p: 2.5, borderRadius: '18px', bgcolor: '#050A0B', border: '1px solid rgba(255,255,255,0.08)' }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
                   <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#00C896', display: 'flex', alignItems: 'center', gap: 1 }}>
