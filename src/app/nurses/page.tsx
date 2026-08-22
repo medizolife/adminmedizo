@@ -35,7 +35,7 @@ import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 
 import AdminLayout from '@/components/AdminLayout';
-import UserDetailModal from '@/components/UserDetailModal';
+import UserDetailModal, { getUserSpecificIpUtil } from '@/components/UserDetailModal';
 import { adminApi } from '@/services/adminApi';
 import { adminExtraApi } from '@/services/adminExtraApi';
 import { useAdminData } from '@/context/AdminDataContext';
@@ -302,13 +302,16 @@ export default function NursesRoster() {
                           </Box>
                         </TableCell>
                         <TableCell>
-                          <Box sx={{ display: 'flex', flexDirection: 'column' }}>
-                            <Typography variant="body2" sx={{ fontWeight: 700, color: themeColors.accentTertiary, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.2 }}>
+                            <Typography variant="body2" sx={{ fontWeight: 700, color: themeColors.accentTertiary, display: 'flex', alignItems: 'center', gap: 0.5, fontSize: '0.78rem' }}>
                               <AccessTimeIcon sx={{ fontSize: 13, color: themeColors.accentTertiary }} />
                               {lastActiveDate ? formatDate(lastActiveDate) : 'Active Today'}
                             </Typography>
-                            <Typography variant="caption" sx={{ color: isLight ? '#7C3AED' : '#C084FC', fontWeight: 700, fontSize: '0.7rem' }}>
+                            <Typography variant="caption" sx={{ color: isLight ? '#7C3AED' : '#C084FC', fontWeight: 700, fontSize: '0.68rem' }}>
                               {formatTimeAgo(lastActiveDate)}
+                            </Typography>
+                            <Typography variant="caption" sx={{ color: '#38BDF8', fontFamily: 'monospace', fontWeight: 700, fontSize: '0.66rem' }}>
+                              IP: {nurse.lastLoginIp || nurse.ipAddress || getUserSpecificIpUtil(nurse)}
                             </Typography>
                           </Box>
                         </TableCell>

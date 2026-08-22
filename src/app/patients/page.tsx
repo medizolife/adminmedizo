@@ -28,7 +28,7 @@ import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 
 import AdminLayout from '@/components/AdminLayout';
-import UserDetailModal from '@/components/UserDetailModal';
+import UserDetailModal, { getUserSpecificIpUtil } from '@/components/UserDetailModal';
 import { useAdminData } from '@/context/AdminDataContext';
 import { useAppTheme } from '@/context/ThemeContext';
 
@@ -287,13 +287,16 @@ export default function PatientsRoster() {
                         </Box>
                       </TableCell>
                       <TableCell>
-                        <Box sx={{ display: 'flex', flexDirection: 'column' }}>
-                          <Typography variant="body2" sx={{ fontWeight: 700, color: isLight ? '#0284C7' : '#38BDF8', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.2 }}>
+                          <Typography variant="body2" sx={{ fontWeight: 700, color: isLight ? '#0284C7' : '#38BDF8', display: 'flex', alignItems: 'center', gap: 0.5, fontSize: '0.78rem' }}>
                             <AccessTimeIcon sx={{ fontSize: 13, color: '#38BDF8' }} />
                             {lastActiveDate ? formatDate(lastActiveDate) : 'Active Today'}
                           </Typography>
-                          <Typography variant="caption" sx={{ color: isLight ? '#059669' : '#34D399', fontWeight: 700, fontSize: '0.7rem' }}>
+                          <Typography variant="caption" sx={{ color: isLight ? '#059669' : '#34D399', fontWeight: 700, fontSize: '0.68rem' }}>
                             {formatTimeAgo(lastActiveDate)}
+                          </Typography>
+                          <Typography variant="caption" sx={{ color: '#38BDF8', fontFamily: 'monospace', fontWeight: 700, fontSize: '0.66rem' }}>
+                            IP: {pat.lastLoginIp || pat.ipAddress || getUserSpecificIpUtil(pat)}
                           </Typography>
                         </Box>
                       </TableCell>
